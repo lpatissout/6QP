@@ -1,0 +1,232 @@
+/* Réinitialisation de base */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+
+header {
+    margin-bottom: 20px;
+}
+
+.screen {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+h1, h2, h3 {
+    color: #4a4a4a;
+    text-align: center;
+}
+
+/* Formulaires et Boutons */
+.input-group {
+    margin-bottom: 15px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"], input[type="number"], select {
+    width: 95%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #5cb85c;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+    margin-top: 10px;
+    display: block;
+    width: 100%;
+}
+
+button:hover:not([disabled]) {
+    background-color: #4cae4c;
+}
+
+button[disabled] {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Salle d'attente */
+#playersList {
+    list-style: none;
+    padding: 0;
+}
+
+#playersList li {
+    background-color: #f9f9f9;
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+/* Conteneurs de Jeu */
+#rowsContainer, #revealedCards {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: #eee;
+    border-radius: 6px;
+    min-height: 80px;
+    overflow-x: auto; /* Pour gérer les rangées trop longues */
+}
+
+.row-label {
+    font-weight: bold;
+    margin-right: 15px;
+    min-width: 100px;
+    color: #333;
+}
+
+/* Les Cartes (l'élément clé du jeu) */
+.card {
+    width: 60px;
+    height: 90px;
+    background-color: #f0ad4e; /* Couleur orangée pour les cartes */
+    border: 1px solid #d4a754;
+    border-radius: 5px;
+    margin-right: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    font-size: 20px;
+    font-weight: bold;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: default;
+    position: relative;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+/* Points de pénalité */
+.card-points {
+    font-size: 12px;
+    font-weight: normal;
+    background-color: #d9534f; /* Rouge pour les points */
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+
+/* Main du joueur */
+#handCards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+#handCards .card {
+    cursor: pointer;
+}
+
+#handCards .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+}
+
+.card.selected {
+    border: 3px solid #007bff; /* Bordure bleue pour la carte sélectionnée */
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.8);
+    transform: translateY(-10px);
+}
+
+.card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Scores */
+#scoresContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 6px;
+}
+
+.score-item {
+    padding: 8px 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    min-width: 180px;
+    font-size: 1.1em;
+}
+
+.score-item span:first-child {
+    font-weight: bold;
+}
+
+/* Boutons de Contrôle */
+.player-controls {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.control-btn {
+    width: auto;
+    margin: 15px auto 5px auto;
+    padding: 12px 25px;
+    background-color: #007bff;
+}
+
+.control-btn:hover:not([disabled]) {
+    background-color: #0056b3;
+}
+
+.banner {
+    background-color: #ffc107;
+    color: #333;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
