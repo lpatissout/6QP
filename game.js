@@ -376,11 +376,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Sélectionner une carte
-    function selectCardToPlay(card) {
+function selectCardToPlay(card) {
+    let newSelectedCard = null;
+    
+    // Récupérer la carte actuellement sélectionnée par le joueur dans la base de données (si elle existe)
+    // NOTE: Pour éviter un appel DB synchrone ici, on se base sur la variable locale selectedCard 
+    // qui est mise à jour par l'écoute Firebase (ce qui est la bonne approche asynchrone).
+    
+    if (selectedCard === card) {
+        // Si la carte cliquée est DÉJÀ sélectionnée, on la désélectionne (newSelectedCard reste null)
+        selectedCard = null; 
+    } else {
+        // Sinon, on sélectionne la nouvelle carte
+        newSelectedCard = card;
         selectedCard = card;
-        database.ref('games/' + gameCode + '/players/' + playerId + '/selectedCard').set(card);
     }
-
+    
+    // Met à jour la base de données avec la nouvelle sélection (ou null si désélectionnée)
+    database.ref('games/' + gameCode + '/players/' + playerId + '/selectedCard').set(newSelectedCard);
+}
     // Jouer la carte
     playCardBtn.addEventListener('click', () => {
         database.ref('games/' + gameCode + '/players/' + playerId).once('value', (snapshot) => {
