@@ -65,6 +65,8 @@ function saveSession(code, name, id, host) {
     localStorage.setItem('playerName', name);
     localStorage.setItem('playerId', id);
     localStorage.setItem('isHost', host ? 'true' : 'false');
+    // On sauvegarde aussi le mode pour la reprise
+    localStorage.setItem('gameMode', host ? 'host' : 'join'); 
 }
 
 /**

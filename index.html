@@ -1,13 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
 <head>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6 Qui Prend ! (Six Taking)</title>
+    <link rel="stylesheet" href="./style.css"> 
     
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
 
 </head>
 <body>
+    <header>
+        <h1>6 Qui Prend !</h1>
+    </header>
+
+    <div id="setupScreen" class="screen">
+        <h2>Créer ou Rejoindre</h2>
+        
+        <div class="input-group">
+            <label for="gameMode">Mode de jeu :</label>
+            <select id="gameMode">
+                <option value="host">Héberger une partie</option>
+                <option value="join">Rejoindre une partie</option>
+                <option value="spectator">Observer une partie</option>
+            </select>
+        </div>
+
+        <div id="joinCodeGroup" class="input-group hidden">
+            <label for="joinCode">Code de la partie :</label>
+            <input type="text" id="joinCode" maxlength="4" placeholder="ABCD">
+        </div>
+
+        <div id="playerNameGroup" class="input-group">
+            <label for="playerName">Votre nom :</label>
+            <input type="text" id="playerName" placeholder="Max">
+        </div>
+        
+        <div id="numPlayersGroup" class="input-group">
+            <label for="numPlayers">Nombre max de joueurs :</label>
+            <input type="number" id="numPlayers" value="4" min="2" max="10">
+        </div>
+
+        <button id="startBtn">Continuer</button>
+    </div>
+
+    <div id="waitingRoom" class="screen hidden">
+        <h2>Salle d'Attente</h2>
+        <p>Code : <span id="displayGameCode"></span></p>
+        
+        <h3>Joueurs connectés :</h3>
+        <ul id="playersList">
+            </ul>
+        
+        <button id="startGameBtn" class="hidden">Lancer la Partie</button>
+    </div>
+
+    <div id="gameScreen" class="screen hidden">
+        <h2 id="gameStatus"></h2>
+        
+        <div id="spectatorBanner" class="hidden banner">
+            Vous êtes Spectateur.
+        </div>
+
+        <h3>Rangées de Cartes</h3>
+        <div id="rowsContainer">
+            </div>
+
+        <div id="revealedContainer" class="hidden">
+            <h3>Cartes Révélées</h3>
+            <div id="revealedCards">
+                </div>
+        </div>
+
+        <h3>Scores (Têtes de bœufs 🐮)</h3>
+        <div id="scoresContainer">
+            </div>
+        
+        <div id="playerHand" class="player-controls hidden">
+            <h3>Votre Main</h3>
+            <div id="handCards">
+                </div>
+            <button id="playCardBtn" disabled>Jouer la carte sélectionnée</button>
+        </div>
+        
+        <button id="nextRoundBtn" class="hidden control-btn">Manche Suivante</button>
+        <button id="newGameBtn" class="hidden control-btn">Nouvelle Partie</button>
     </div>
     
     <script src="./utils.js"></script>
-    <script src="./game.js"></script> 
+    <script src="./game.js"></script>
 </body>
 </html>
