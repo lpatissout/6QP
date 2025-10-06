@@ -1,31 +1,4 @@
-// Fonctions utilitaires :
-
-/**
- * Calcule le nombre de points de pénalité pour une carte.
- * @param {number} card - La valeur de la carte (1 à 104).
- * @returns {number} - Le nombre de points de pénalité.
- */
-function getCardPoints(card) {
-    if (card === 55) return 7;
-    if (card % 11 === 0) return 5;
-    if (card % 10 === 0) return 3;
-    if (card % 5 === 0) return 2;
-    return 1;
-}
-
-/**
- * Crée le HTML pour afficher une carte.
- * @param {number} card - La valeur de la carte.
- * @returns {string} - Le HTML de la carte.
- */
-function createCardHTML(card) {
-    return `<div class="card">${card}<div class="card-points">${getCardPoints(card)}</div></div>`;
-}
-
-/**
- * Génère un code de jeu aléatoire de 4 lettres.
- * @returns {string} - Le code du jeu.
- */
+// Fonctions utilitaires
 function generateGameCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let code = '';
@@ -35,18 +8,10 @@ function generateGameCode() {
     return code;
 }
 
-/**
- * Génère un identifiant de joueur unique.
- * @returns {string} - L'ID du joueur.
- */
 function generatePlayerId() {
     return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
-/**
- * Mélange un tableau (Algorithme de Fisher-Yates).
- * @param {Array<any>} array - Le tableau à mélanger.
- */
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -54,33 +19,66 @@ function shuffleArray(array) {
     }
 }
 
+function getCardPoints(card) {
+    if (card === 55) return 7;
+    if (card % 11 === 0) return 5;
+    if (card % 10 === 0) return 3;
+    if (card % 5 === 0) return 2;
+    return 1;
+}
 
-// --- Fonctions de Persistance (pour résoudre le problème de rechargement) ---
-
-/**
- * Sauvegarde les infos de session dans le stockage local du navigateur.
- */
-function saveSession(code, name, id, host) {
-    localStorage.setItem('gameCode', code);
-    localStorage.setItem('playerName', name);
-    localStorage.setItem('playerId', id);
-    localStorage.setItem('isHost', host ? 'true' : 'false');
-    // On sauvegarde aussi le mode pour la reprise
-    localStorage.setItem('gameMode', host ? 'host' : 'join'); 
+function createCardHTML(card) {
+    return `<div class="card">${card}<div class="card-points">${getCardPoints(card)}</div></div>`;
 }
 
 /**
- * Récupère les infos de session sauvegardées.
- * @returns {{code: string, name: string, id: string, isHost: boolean} | null}
+ * Place une carte sur le plateau de jeu selon les règles du 6 qui prend.
+ * @param {number} card - La carte à placer.
+ * @param {Array<Array<number>>} rows - Le tableau 2D des rangées.
+ * @returns {{rows: Array<Array<number>>, penalty: number}} - Les nouvelles rangées et la pénalité.
  */
-function loadSession() {
-    const code = localStorage.getItem('gameCode');
-    const name = localStorage.getItem('playerName');
-    const id = localStorage.getItem('playerId');
-    const isHost = localStorage.getItem('isHost') === 'true';
-
-    if (code && name && id) {
-        return { code, name, id, isHost };
+function placeCard(card, rows) {
+    let bestRow = -1;
+    let smallestDiff = Infinity;
+    
+    // 1. Trouver la meilleure rangée (carte la plus proche et inférieure)
+    rows.forEach((row, index) => {
+        const lastCard = row[row.length - 1];
+        if (card > lastCard) {
+            const diff = card - lastCard;
+            if (diff < smallestDiff) {
+                smallestDiff = diff;
+                bestRow = index;
+            }
+        }
+    });
+    
+    let penalty = 0;
+    const newRows = rows.map(r => [...r]);
+    
+    if (bestRow === -1) {
+        // 2. CAS 1 : Carte trop petite pour toutes les rangées (prend la rangée la moins pénalisante)
+        let minPenalty = Infinity;
+        let rowToPick = -1;
+        
+        newRows.forEach((row, index) => {
+            const rowPenalty = row.reduce((sum, c) => sum + getCardPoints(c), 0);
+            if (rowPenalty < minPenalty) {
+                minPenalty = rowPenalty;
+                rowToPick = index;
+            }
+        });
+        
+        penalty = newRows[rowToPick].reduce((sum, c) => sum + getCardPoints(c), 0);
+        newRows[rowToPick] = [card];
+    } else if (newRows[bestRow].length === 5) {
+        // 3. CAS 2 : Rangée pleine (5 cartes), prendre la rangée
+        penalty = newRows[bestRow].reduce((sum, c) => sum + getCardPoints(c), 0);
+        newRows[bestRow] = [card];
+    } else {
+        // 4. CAS 3 : Ajouter à la rangée
+        newRows[bestRow].push(card);
     }
-    return null;
+    
+    return { rows: newRows, penalty };
 }
