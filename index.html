@@ -3,22 +3,312 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>6 qui prend !</title>
-    <link rel="stylesheet" href="style.css">
-    </head>
-<body>
-    <h1>6 qui prend !</h1>
+    <title>6 qui prend!</title>
 
-    <div id="game-board">
-        <p>Chargement du jeu...</p>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-database-compat.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .setup-screen, .game-screen {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            background: rgba(255,255,255,0.9);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .card {
+            background: white;
+            color: #333;
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 70px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.3em;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-block;
+            margin: 5px;
+            position: relative;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        }
+        .card.selected {
+            background: #FFD700;
+            transform: translateY(-10px);
+        }
+        .card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .card-points {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #f44336;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+        }
+        .hand {
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+        }
+        .hand h3 {
+            margin-bottom: 15px;
+        }
+        .rows {
+            display: grid;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .row {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+        .row-label {
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 100px;
+            font-size: 1.1em;
+        }
+        .scores {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .status {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 1.2em;
+        }
+        .spectator-mode {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 193, 7, 0.3);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .waiting-room {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .player-list {
+            list-style: none;
+            padding: 0;
+        }
+        .player-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+        .game-code {
+            font-size: 2em;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            margin: 20px 0;
+            letter-spacing: 3px;
+        }
+        .revealed-cards {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .action-buttons {
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐮 6 qui prend! 🐮</h1>
+        
+        <div id="setupScreen" class="setup-screen">
+            <div class="input-group">
+                <label>Mode de jeu :</label>
+                <select id="gameMode">
+                    <option value="host">Créer une partie (Hôte)</option>
+                    <option value="join">Rejoindre une partie</option>
+                    <option value="spectator">Mode spectateur (Tablette)</option>
+                </select>
+            </div>
+            
+            <div id="joinCodeGroup" class="input-group hidden">
+                <label>Code de la partie :</label>
+                <input type="text" id="joinCode" placeholder="Ex: ABCD" maxlength="4">
+            </div>
+            
+            <div id="playerNameGroup" class="input-group">
+                <label>Votre nom :</label>
+                <input type="text" id="playerName" placeholder="Entrez votre prénom">
+            </div>
+            
+            <div id="numPlayersGroup" class="input-group hidden">
+                <label>Nombre de joueurs :</label>
+                <select id="numPlayers">
+                    <option value="2">2 joueurs</option>
+                    <option value="3">3 joueurs</option>
+                    <option value="4">4 joueurs</option>
+                    <option value="5">5 joueurs</option>
+                    <option value="6">6 joueurs</option>
+                </select>
+            </div>
+            
+            <div style="text-align: center;">
+                <button id="startBtn">Continuer</button>
+            </div>
+        </div>
+        
+        <div id="waitingRoom" class="setup-screen hidden">
+            <div class="game-code">
+                Code de partie : <span id="displayGameCode"></span>
+            </div>
+            <p style="text-align: center; margin: 20px 0;">Partagez ce code avec vos amis !</p>
+            
+            <div class="waiting-room">
+                <h3>Joueurs connectés :</h3>
+                <ul id="playersList" class="player-list"></ul>
+            </div>
+            
+            <div style="text-align: center;">
+                <button id="startGameBtn" class="hidden">Démarrer la partie</button>
+            </div>
+        </div>
+        
+        <div id="gameScreen" class="game-screen hidden">
+            <div id="spectatorBanner" class="spectator-mode hidden">
+                👁️ Mode spectateur - Vue de la table de jeu
+            </div>
+            
+            <div class="status" id="gameStatus">En attente...</div>
+            
+            <div id="rowsContainer" class="rows"></div>
+            
+            <div id="revealedContainer" class="revealed-cards hidden">
+                <h3>Cartes jouées ce tour :</h3>
+                <div id="revealedCards"></div>
+            </div>
+            
+            <div id="playerHand" class="hand hidden">
+                <h3>Votre main :</h3>
+                <div id="handCards"></div>
+                <div class="action-buttons">
+                    <button id="playCardBtn" disabled>Jouer la carte sélectionnée</button>
+                </div>
+            </div>
+            
+            <div class="scores">
+                <h3>Scores (Pénalités) :</h3>
+                <div id="scoresContainer"></div>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="nextRoundBtn" class="hidden">Manche suivante</button>
+                <button id="newGameBtn" class="hidden">Nouvelle partie</button>
+            </div>
+        </div>
     </div>
 
-    <div id="player-hand">
-        <h2>Votre main</h2>
-        </div>
-
-    <button id="play-card-button">Jouer la carte sélectionnée</button>
-
-    <script src="script.js"></script>
+    <script src="/6QP/utils.js"></script>
+    <script src="/6QP/game.js"></script>
 </body>
 </html>
