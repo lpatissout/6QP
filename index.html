@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6 qui prend ! - Jeu en ligne</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans:wght@400;600&display=swap');
+        body {
+            font-family: 'Open Sans', sans-serif;
+        }
+        h1, h2, h3, h4 {
+            font-family: 'Montserrat', sans-serif;
+        }
+        .card-flip {
+            animation: flip 0.6s ease-in-out;
+        }
+        @keyframes flip {
+            0%, 100% { transform: rotateY(0deg); }
+            50% { transform: rotateY(180deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-100 to-orange-200 min-h-screen">
+    <div id="app"></div>
+
+    <script>
+        // Configuration globale
+        const STORAGE_PREFIX = 'game:';
+        const SYNC_INTERVAL = 2000;
+        
+        // État global de l'application
+        let state = {
+            screen: 'home', // home, lobby, game
+            gameCode: '',
+            playerName: '',
+            joinCode: '',
+            game: null,
+            playerId: null,
+            selectedCard: null,
+            chatMessage: '',
+            showChat: false,
+            copied: false
+        };
+
+        // Utilitaires
+        const generateGameCode = () => {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        };
+
+        const calculateHeads = (card) => {
+            if (card === 55) return 7;
+            if (card % 11 === 0) return 5;
+            if (card % 10 === 0) return 3;
+            if (card % 5 === 0) return 2;
+            return 1;
+        };
+
+        const getCardColor = (card) => {
+            if (card <= 26) return 'bg-blue-400';
+            if (card <= 52) return 'bg-green-400';
+            if (card <= 78) return 'bg-yellow-400';
+            return 'bg-red-400';
+        };
+
+        const shuffleDeck = () => {
+            const deck = Array.from({ length: 104 }, (_, i) => i + 1);
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        };
+
+        // Gestion du stockage (simulation si storage non disponible)
+        const storage = {
+            data: {},
+            async get(key, shared = false) {
+                try {
+                    if (window.storage) {
+                        return await window.storage.get(key, shared);
+                    }
+                    const value = this.data[key];
+                    return value ? { key, value, shared } : null;
+                } catch (error) {
+                    const value = this.data[key];
+                    return value ? { key, value, shared } : null;
+                }
+            },
+            async set(key, value, shared = false) {
+                try {
+                    if (window.storage) {
+                        return await window.storage.set(key, value, shared);
+                    }
+                    this.data[key] = value;
+                    return { key, value, shared };
+                } catch (error) {
+                    this.data[key] = value;
+                    return { key, value, shared };
+                }
+            }
+        };
+
+        // Synchronisation du jeu
+        const syncGame = async () => {
+            if (!state.gameCode || state.screen === 'home') return;
+            
+            try {
+                const result = await storage.get(`${STORAGE_PREFIX}${state.gameCode}`, true);
+                if (result && result.value) {
+                    state.game = JSON.parse(result.value);
+                    render();
+                }
+            } catch (error) {
+                console.log('Erreur de synchronisation');
+            }
+        };
+
+        const saveGame = async (gameData) => {
+            state.game = gameData;
+            await storage.set(`${STORAGE_PREFIX}${state.gameCode}`, JSON.stringify(gameData), true);
+            render();
+        };
+
+        // Actions
+        const createGame = async () => {
+            if (!state.playerName.trim()) return;
+            
+            const code = generateGameCode();
+            const newPlayerId = Math.random().toString(36).substring(7);
+            
+            const newGame = {
+                code,
+                status: 'waiting',
+                hostId: newPlayerId,
+                players: [{
+                    id: newPlayerId,
+                    name: state.playerName,
+                    score: 0,
+                    ready: false,
+                    connected: true,
+                    hand: [],
+                    playedCard: null
+                }],
+                rows: [],
+                round: 0,
+                chat: [],
+                currentTurn: 0,
+                maxRounds: 6
+            };
+
+            state.gameCode = code;
+            state.playerId = newPlayerId;
+            await saveGame(newGame);
+            state.screen = 'lobby';
+            render();
+        };
+
+        const joinGame = async () => {
+            if (!state.playerName.trim() || !state.joinCode.trim()) return;
+            
+            try {
+                const result = await storage.get(`${STORAGE_PREFIX}${state.joinCode.toUpperCase()}`, true);
+                if (!result || !result.value) {
+                    alert('Partie introuvable !');
+                    return;
+                }
+
+                const gameData = JSON.parse(result.value);
+                
+                if (gameData.status !== 'waiting') {
+                    alert('La partie a déjà commencé !');
+                    return;
+                }
+
+                if (gameData.players.length >= 10) {
+                    alert('Partie complète !');
+                    return;
+                }
+
+                const newPlayerId = Math.random().toString(36).substring(7);
+                gameData.players.push({
+                    id: newPlayerId,
+                    name: state.playerName,
+                    score: 0,
+                    ready: false,
+                    connected: true,
+                    hand: [],
+                    playedCard: null
+                });
+
+                state.gameCode = state.joinCode.toUpperCase();
+                state.playerId = newPlayerId;
+                await saveGame(gameData);
+                state.screen = 'lobby';
+                render();
+            } catch (error) {
+                alert('Erreur lors de la connexion');
+            }
+        };
+
+        const toggleReady = async () => {
+            const player = state.game.players.find(p => p.id === state.playerId);
+            player.ready = !player.ready;
+            await saveGame(state.game);
+        };
+
+        const startGame = async () => {
+            if (state.game.hostId !== state.playerId) return;
+            if (state.game.players.length < 2) {
+                alert('Il faut au moins 2 joueurs !');
+                return;
+            }
+            if (!state.game.players.every(p => p.ready)) {
+                alert('Tous les joueurs doivent être prêts !');
+                return;
+            }
+
+            const deck = shuffleDeck();
+            
+            const rows = [
+                [deck.shift()],
+                [deck.shift()],
+                [deck.shift()],
+                [deck.shift()]
+            ];
+
+            state.game.players.forEach(player => {
+                player.hand = deck.splice(0, 10).sort((a, b) => a - b);
+                player.playedCard = null;
+            });
+
+            state.game.status = 'playing';
+            state.game.rows = rows;
+            state.game.round = 1;
+            state.game.currentTurn = 1;
+
+            await saveGame(state.game);
+            state.screen = 'game';
+            render();
+        };
+
+        const playCard = async (card) => {
+            const player = state.game.players.find(p => p.id === state.playerId);
+            if (player.playedCard) return;
+
+            player.playedCard = card;
+            player.hand = player.hand.filter(c => c !== card);
+            
+            await saveGame(state.game);
+            state.selectedCard = null;
+
+            if (state.game.players.every(p => p.playedCard !== null)) {
+                setTimeout(() => resolveTurn(), 1500);
+            }
+        };
+
+        const resolveTurn = async () => {
+            await syncGame();
+            const gameData = state.game;
+            
+            const plays = gameData.players
+                .map(p => ({ playerId: p.id, card: p.playedCard }))
+                .sort((a, b) => a.card - b.card);
+
+            for (const play of plays) {
+                const player = gameData.players.find(p => p.id === play.playerId);
+                
+                const validRows = gameData.rows
+                    .map((row, idx) => ({
+                        idx,
+                        last: row[row.length - 1],
+                        diff: play.card - row[row.length - 1]
+                    }))
+                    .filter(r => r.diff > 0);
+
+                if (validRows.length === 0) {
+                    const penalty = gameData.rows[0];
+                    player.score += penalty.reduce((sum, c) => sum + calculateHeads(c), 0);
+                    gameData.rows[0] = [play.card];
+                } else {
+                    const target = validRows.reduce((min, curr) => 
+                        curr.diff < min.diff ? curr : min
+                    );
+                    
+                    if (gameData.rows[target.idx].length === 5) {
+                        const penalty = gameData.rows[target.idx];
+                        player.score += penalty.reduce((sum, c) => sum + calculateHeads(c), 0);
+                        gameData.rows[target.idx] = [play.card];
+                    } else {
+                        gameData.rows[target.idx].push(play.card);
+                    }
+                }
+                
+                player.playedCard = null;
+            }
+
+            gameData.currentTurn++;
+
+            if (gameData.currentTurn > 10) {
+                gameData.round++;
+                
+                if (gameData.round > gameData.maxRounds) {
+                    gameData.status = 'finished';
+                } else {
+                    const deck = shuffleDeck();
+                    gameData.rows = [
+                        [deck.shift()],
+                        [deck.shift()],
+                        [deck.shift()],
+                        [deck.shift()]
+                    ];
+                    gameData.players.forEach(player => {
+                        player.hand = deck.splice(0, 10).sort((a, b) => a - b);
+                    });
+                    gameData.currentTurn = 1;
+                }
+            }
+
+            await saveGame(gameData);
+        };
+
+        const sendMessage = async () => {
+            if (!state.chatMessage.trim()) return;
+            
+            const player = state.game.players.find(p => p.id === state.playerId);
+            state.game.chat = state.game.chat || [];
+            state.game.chat.push({
+                player: player.name,
+                message: state.chatMessage,
+                time: new Date().toLocaleTimeString()
+            });
+            
+            state.chatMessage = '';
+            await saveGame(state.game);
+        };
+
+        const copyLink = () => {
+            navigator.clipboard.writeText(`${window.location.href}?join=${state.gameCode}`);
+            state.copied = true;
+            render();
+            setTimeout(() => {
+                state.copied = false;
+                render();
+            }, 2000);
+        };
+
+        // Composants de rendu
+        const Card = (number, selected = false, onSelect = null, disabled = false, small = false) => {
+            const heads = calculateHeads(number);
+            const colorClass = getCardColor(number);
+            const sizeClass = small ? 'w-12 h-16 text-xs' : 'w-16 h-24 text-sm';
+            
+            return `
+                <button
+                    onclick="${onSelect ? `(${onSelect})(${number})` : ''}"
+                    ${disabled ? 'disabled' : ''}
+                    class="${sizeClass} ${colorClass} text-white rounded-lg shadow-md flex flex-col items-center justify-between p-1 transition-all duration-200 ${selected ? 'ring-4 ring-blue-600 scale-105' : ''} ${!disabled && !selected ? 'hover:scale-105 hover:shadow-lg cursor-pointer' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} font-bold"
+                >
+                    <span class="text-xl">${number}</span>
+                    <div class="flex gap-0.5 flex-wrap justify-center">
+                        ${'🐮'.repeat(heads)}
+                    </div>
+                </button>
+            `;
+        };
+
+        const HomeScreen = () => `
+            <div class="min-h-screen p-8 flex items-center justify-center">
+                <div class="max-w-md w-full">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8">
+                        <div class="text-center mb-8">
+                            <h1 class="text-4xl font-bold text-orange-600 mb-2">🐮 6 qui prend !</h1>
+                            <p class="text-gray-600">Jouez en ligne avec vos amis</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <input
+                                type="text"
+                                id="playerName"
+                                placeholder="Votre pseudo"
+                                value="${state.playerName}"
+                                oninput="state.playerName = this.value; render()"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                                maxlength="15"
+                            />
+
+                            <button
+                                onclick="createGame()"
+                                ${!state.playerName.trim() ? 'disabled' : ''}
+                                class="w-full bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                🎮 Créer une partie
+                            </button>
+
+                            <div class="relative">
+                                <div class="absolute inset-0 flex items-center">
+                                    <div class="w-full border-t border-gray-300"></div>
+                                </div>
+                                <div class="relative flex justify-center text-sm">
+                                    <span class="px-2 bg-white text-gray-500">ou</span>
+                                </div>
+                            </div>
+
+                            <input
+                                type="text"
+                                id="joinCode"
+                                placeholder="Code de la partie"
+                                value="${state.joinCode}"
+                                oninput="state.joinCode = this.value.toUpperCase(); render()"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none uppercase"
+                                maxlength="6"
+                            />
+
+                            <button
+                                onclick="joinGame()"
+                                ${!state.playerName.trim() || !state.joinCode.trim() ? 'disabled' : ''}
+                                class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                👥 Rejoindre une partie
+                            </button>
+                        </div>
+
+                        <div class="mt-8 p-4 bg-orange-50 rounded-lg text-sm text-gray-700">
+                            <p class="font-semibold mb-2">Comment jouer :</p>
+                            <ul class="space-y-1 text-xs">
+                                <li>• Créez ou rejoignez une partie</li>
+                                <li>• Choisissez une carte secrètement</li>
+                                <li>• Évitez de ramasser des têtes de bœuf !</li>
+                                <li>• Le joueur avec le moins de têtes gagne</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const LobbyScreen = () => `
+            <div class="min-h-screen p-8 flex items-center justify-center">
+                <div class="max-w-2xl w-full">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8">
+                        <div class="text-center mb-6">
+                            <h2 class="text-3xl font-bold text-orange-600 mb-2">Salon d'attente</h2>
+                            <div class="flex items-center justify-center gap-2 text-gray-600">
+                                <span class="text-xl font-mono bg-gray-100 px-4 py-2 rounded-lg">${state.gameCode}</span>
+                                <button
+                                    onclick="copyLink()"
+                                    class="p-2 hover:bg-gray-100 rounded-lg transition"
+                                    title="Copier le lien"
+                                >
+                                    ${state.copied ? '✓' : '📋'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 mb-6">
+                            ${state.game.players.map(player => `
+                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center gap-3">
+                                        ${player.id === state.game.hostId ? '👑' : ''}
+                                        <span class="font-semibold">${player.name}</span>
+                                        ${player.id === state.playerId ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Vous</span>' : ''}
+                                    </div>
+                                    <div>
+                                        ${player.ready ? '<span class="text-green-500 text-sm font-semibold">✓ Prêt</span>' : '<span class="text-gray-400 text-sm">En attente...</span>'}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="space-y-3">
+                            <button
+                                onclick="toggleReady()"
+                                class="w-full py-3 rounded-lg font-semibold transition ${
+                                    state.game.players.find(p => p.id === state.playerId)?.ready
+                                        ? 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                                        : 'bg-green-500 text-white hover:bg-green-600'
+                                }"
+                            >
+                                ${state.game.players.find(p => p.id === state.playerId)?.ready ? 'Annuler' : 'Je suis prêt !'}
+                            </button>
+
+                            ${state.game.hostId === state.playerId ? `
+                                <button
+                                    onclick="startGame()"
+                                    ${state.game.players.length < 2 || !state.game.players.every(p => p.ready) ? 'disabled' : ''}
+                                    class="w-full bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Démarrer la partie
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div class="mt-6 text-center text-sm text-gray-500">
+                            ${state.game.players.length}/10 joueurs • Attendez que tout le monde soit prêt
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const GameScreen = () => {
+            const currentPlayer = state.game.players.find(p => p.id === state.playerId);
+            const allPlayed = state.game.players.every(p => p.playedCard !== null);
+
+            if (state.game.status === 'finished') {
+                const winner = state.game.players.reduce((min, p) => p.score < min.score ? p : min);
+                
+                return `
+                    <div class="min-h-screen p-8 flex items-center justify-center">
+                        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+                            <h2 class="text-4xl font-bold text-orange-600 mb-6">🏆 Partie terminée !</h2>
+                            
+                            <div class="mb-6">
+                                <p class="text-2xl font-bold text-green-600 mb-2">${winner.name} gagne !</p>
+                                <p class="text-gray-600">avec ${winner.score} têtes de bœuf</p>
+                            </div>
+
+                            <div class="space-y-2 mb-6">
+                                ${state.game.players.sort((a, b) => a.score - b.score).map((player, idx) => `
+                                    <div class="flex justify-between p-3 bg-gray-50 rounded-lg">
+                                        <span class="font-semibold">#${idx + 1} ${player.name}</span>
+                                        <span class="text-gray-600">${player.score} 🐮</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+
+                            <button
+                                onclick="state.screen = 'home'; state.game = null; state.gameCode = ''; render()"
+                                class="w-full bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 transition"
+                            >
+                                Nouvelle partie
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="min-h-screen p-4">
+                    <div class="max-w-7xl mx-auto">
+                        <div class="bg-white rounded-xl shadow-lg p-4 mb-4 flex justify-between items-center">
+                            <div>
+                                <h3 class="text-xl font-bold text-orange-600">Manche ${state.game.round}/${state.game.maxRounds}</h3>
+                                <p class="text-sm text-gray-600">Tour ${state.game.currentTurn}/10</p>
+                            </div>
+                            <button
+                                onclick="state.showChat = !state.showChat; render()"
+                                class="p-2 hover:bg-gray-100 rounded-lg transition relative"
+                            >
+                                💬
+                                ${state.game.chat?.length > 0 ? `<span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">${state.game.chat.length}</span>` : ''}
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                            <div class="lg:col-span-3 space-y-4">
+                                <div class="bg-white rounded-xl shadow-lg p-6">
+                                    <h4 class="text-lg font-semibold mb-4 text-gray-700">Rangées</h4>
+                                    <div class="space-y-3">
+                                        ${state.game.rows.map((row, idx) => `
+                                            <div class="flex gap-2 items-center">
+                                                <span class="text-sm font-semibold text-gray-500 w-8">#${idx + 1}</span>
+                                                <div class="flex gap-1 flex-wrap">
+                                                    ${row.map(card => Card(card, false, null, true, true)).join('')}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+
+                                <div class="bg-white rounded-xl shadow-lg p-6">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h4 class="text-lg font-semibold text-gray-700">Votre main</h4>
+                                        ${allPlayed ? '<span class="text-green-600 font-semibold">✓ En attente des autres...</span>' : 
+                                          currentPlayer?.playedCard ? `<span class="text-blue-600 font-semibold">Carte jouée : ${currentPlayer.playedCard}</span>` :
+                                          '<span class="text-orange-600 font-semibold">Choisissez une carte !</span>'}
+                                    </div>
+                                    <div class="flex gap-2 flex-wrap justify-center">
+                                        ${currentPlayer?.hand.map(card => 
+                                            Card(card, state.selectedCard === card, 
+                                            currentPlayer.playedCard ? null : `(card) => { 
+                                                if (state.selectedCard === card) { 
+                                                    playCard(card); 
+                                                } else { 
+                                                    state.selectedCard = card; 
+                                                    render(); 
+                                                } 
+                                            }`, 
+                                            currentPlayer.playedCard !== null)
+                                        ).join('')}
+                                    </div>
+                                    ${state.selectedCard && !currentPlayer?.playedCard ? `
+                                        <div class="mt-4 text-center">
+                                            <button
+                                                onclick="playCard(${state.selectedCard})"
+                                                class="bg-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-600 transition"
+                                            >
+                                                Jouer la carte ${state.selectedCard}
+                                            </button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="bg-white rounded-xl shadow-lg p-4">
+                                    <h4 class="text-lg font-semibold mb-3 text-gray-700">Joueurs</h4>
+                                    <div class="space-y-2">
+                                        ${state.game.players.sort((a, b) => a.score - b.score).map(player => `
+                                            <div class="p-3 rounded-lg ${player.id === state.playerId ? 'bg-blue-50 border-2 border-blue-300' : 'bg-gray-50'}">
+                                                <div class="flex justify-between items-start mb-1">
+                                                    <div class="flex items-center gap-1">
+                                                        ${player.id === state.game.hostId ? '👑' : ''}
+                                                        <span class="font-semibold text-sm">${player.name}</span>
+                                                    </div>
+                                                    ${player.playedCard ? '<span class="text-green-500 text-xs">✓</span>' : ''}
+                                                </div>
+                                                <div class="flex justify-between text-xs text-gray-600">
+                                                    <span>Score: ${player.score} 🐮</span>
+                                                    <span>Cartes: ${player.hand.length}</span>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+
+                                ${state.showChat ? `
+                                    <div class="bg-white rounded-xl shadow-lg p-4">
+                                        <h4 class="text-lg font-semibold mb-3 text-gray-700">Chat</h4>
+                                        <div class="h-40 overflow-y-auto mb-3 space-y-2">
+                                            ${state.game.chat?.map(msg => `
+                                                <div class="text-xs">
+                                                    <span class="font-semibold text-blue-600">${msg.player}:</span>
+                                                    <span class="text-gray-700">${msg.message}</span>
+                                                </div>
+                                            `).join('') || ''}
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value="${state.chatMessage}"
+                                                oninput="state.chatMessage = this.value"
+                                                onkeypress="if(event.key === 'Enter') sendMessage()"
+                                                placeholder="Message..."
+                                                class="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                                maxlength="100"
+                                            />
+                                            <button
+                                                onclick="sendMessage()"
+                                                class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600"
+                                            >
+                                                →
+                                            </button>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        // Rendu principal
+        const render = () => {
+            const app = document.getElementById('app');
+            if (!app) return;
+
+            if (state.screen === 'home') {
+                app.innerHTML = HomeScreen();
+            } else if (state.screen === 'lobby') {
+                app.innerHTML = LobbyScreen();
+            } else if (state.screen === 'game') {
+                app.innerHTML = GameScreen();
+            }
+        };
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auto-join depuis URL
+            const params = new URLSearchParams(window.location.search);
+            const join = params.get('join');
+            if (join) {
+                state.joinCode = join;
+            }
+
+            render();
+
+            // Démarrer la synchronisation
+            setInterval(syncGame, SYNC_INTERVAL);
+        });
+    </script>
+</body>
+</html>
