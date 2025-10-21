@@ -81,9 +81,11 @@
                     if (window.storage) {
                         return await window.storage.get(key, shared);
                     }
-                    const value = this.data[key];
+                    // Fallback : utiliser localStorage
+                    const value = localStorage.getItem(key);
                     return value ? { key, value, shared } : null;
                 } catch (error) {
+                    // Double fallback : mémoire
                     const value = this.data[key];
                     return value ? { key, value, shared } : null;
                 }
@@ -93,9 +95,11 @@
                     if (window.storage) {
                         return await window.storage.set(key, value, shared);
                     }
-                    this.data[key] = value;
+                    // Fallback : utiliser localStorage
+                    localStorage.setItem(key, value);
                     return { key, value, shared };
                 } catch (error) {
+                    // Double fallback : mémoire
                     this.data[key] = value;
                     return { key, value, shared };
                 }
@@ -381,7 +385,7 @@
                                 id="playerName"
                                 placeholder="Votre pseudo"
                                 value="${state.playerName}"
-                                oninput="state.playerName = this.value; render()"
+                                oninput="state.playerName = this.value"
                                 class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
                                 maxlength="15"
                             />
@@ -408,7 +412,7 @@
                                 id="joinCode"
                                 placeholder="Code de la partie"
                                 value="${state.joinCode}"
-                                oninput="state.joinCode = this.value.toUpperCase(); render()"
+                                oninput="state.joinCode = this.value.toUpperCase()"
                                 class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none uppercase"
                                 maxlength="6"
                             />
