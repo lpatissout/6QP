@@ -389,14 +389,22 @@ const leaveGame = () => {
 };
 
 const chooseRow = async (rowIndex) => {
+    console.log('chooseRow called with index:', rowIndex);
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
-    if (!game || game.waitingForRowChoice !== state.playerId) return;
+    console.log('Current game state:', game.waitingForRowChoice, 'My ID:', state.playerId);
+    
+    if (!game || game.waitingForRowChoice !== state.playerId) {
+        console.log('Not authorized to choose or no game');
+        return;
+    }
     
     // Le joueur ramasse la rangée
     const p = game.players.find(x => x.id === state.playerId);
     const penaltyRow = game.rows[rowIndex];
     p.score += penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
+    
+    console.log('Player picked up row', rowIndex, 'with', penaltyRow.length, 'cards');
     
     // Remplacer la rangée par la carte en attente
     game.rows[rowIndex] = [game.pendingCard];
@@ -407,6 +415,9 @@ const chooseRow = async (rowIndex) => {
     // Continuer la résolution du tour
     await resolveAllPlays(game);
 };
+
+// Exposer la fonction globalement pour qu'elle soit accessible depuis le HTML
+window.chooseRow = chooseRow;
 
 const Card = (num, sel, click, dis, small) => {
     const h = calculateHeads(num);
