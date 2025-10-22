@@ -28,7 +28,7 @@
         ⚠️ Firebase non configuré ! Suivez les instructions ci-dessous.
     </div>
 
-    <script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyC2YfNviAE_jDD0wT7TmfZBeOaKqjJdJuQ",
   authDomain: "quiprend-879a6.firebaseapp.com",
@@ -102,14 +102,22 @@ const subscribeToGame = (code) => {
     if (!database) return;
     if (gameRef) gameRef.off();
     gameRef = database.ref('games/' + code);
-    gameRef.on('value', (snap) => {
+    gameRef.on('value', async (snap) => {
         const data = snap.val();
-        if (data) {
-            state.game = data;
-            // Si la partie a commencé, passe tous les joueurs à l'écran "game"
-            if (state.screen === 'lobby' && data.status === 'playing') state.screen = 'game';
-            render();
+        if (!data) return;
+        state.game = data;
+
+        // Si tous les joueurs ont joué et le tour n’a pas encore été résolu, résoudre le tour
+        if (state.game.status === 'playing' && !state.game.turnResolved) {
+            const allPlayed = state.game.players.every(p => p.playedCard !== null);
+            if (allPlayed) {
+                await resolveTurn();
+            }
         }
+
+        // Si la partie a commencé, passer tous les joueurs à l'écran "game"
+        if (state.screen === 'lobby' && data.status === 'playing') state.screen = 'game';
+        render();
     });
 };
 
@@ -141,7 +149,8 @@ const createGame = async () => {
         round: 0,
         chat: [],
         currentTurn: 0,
-        maxRounds: 6
+        maxRounds: 6,
+        turnResolved: false
     });
     
     subscribeToGame(code);
@@ -207,6 +216,7 @@ const startGame = async () => {
     state.game.status = 'playing';
     state.game.round = 1;
     state.game.currentTurn = 1;
+    state.game.turnResolved = false;
 
     await saveGame(state.game);
     state.screen = 'game';
@@ -221,65 +231,57 @@ const playCard = async (card) => {
     p.hand = p.hand.filter(c => c !== card);
     await saveGame(state.game);
     state.selectedCard = null;
-
-    // --- Nouvelle logique pour résoudre le tour automatiquement ---
-    if (state.game.players.every(x => x.playedCard)) {
-        if (!state.game.resolving) {
-            state.game.resolving = true;
-            await saveGame(state.game);
-            setTimeout(async () => {
-                await resolveTurn();
-                const g = state.game;
-                g.resolving = false;
-                await saveGame(g);
-            }, 1500);
-        }
-    }
+    render();
 };
 
 const resolveTurn = async () => {
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
-    
+    if (!game) return;
+
+    game.turnResolved = true; // pour éviter double résolution
     const plays = game.players.map(p => ({ pid: p.id, card: p.playedCard })).sort((a, b) => a.card - b.card);
 
     for (const play of plays) {
         const p = game.players.find(x => x.id === play.pid);
-        const valid = game.rows.map((r, i) => ({ i, last: r[r.length - 1], diff: play.card - r[r.length - 1] })).filter(x => x.diff > 0);
+        const validRows = game.rows.map((r, i) => ({ i, last: r[r.length-1], diff: play.card - r[r.length-1] })).filter(x => x.diff > 0);
 
-        if (!valid.length) {
-            const pen = game.rows[0];
-            p.score += pen.reduce((s, c) => s + calculateHeads(c), 0);
+        if (!validRows.length) {
+            const penaltyRow = game.rows[0];
+            p.score += penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
             game.rows[0] = [play.card];
         } else {
-            const t = valid.reduce((min, cur) => cur.diff < min.diff ? cur : min);
-            if (game.rows[t.i].length === 5) {
-                const pen = game.rows[t.i];
-                p.score += pen.reduce((s, c) => s + calculateHeads(c), 0);
-                game.rows[t.i] = [play.card];
+            const chosenRow = validRows.reduce((min, cur) => cur.diff < min.diff ? cur : min);
+            if (game.rows[chosenRow.i].length === 5) {
+                const penaltyRow = game.rows[chosenRow.i];
+                p.score += penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
+                game.rows[chosenRow.i] = [play.card];
             } else {
-                game.rows[t.i].push(play.card);
+                game.rows[chosenRow.i].push(play.card);
             }
         }
         p.playedCard = null;
     }
 
+    // Avancer le tour et la manche
     game.currentTurn++;
     if (game.currentTurn > 10) {
         game.round++;
-        if (game.round > game.maxRounds) {
-            game.status = 'finished';
-        } else {
+        if (game.round > game.maxRounds) game.status = 'finished';
+        else {
             const deck = shuffleDeck();
             game.rows = [[deck.shift()], [deck.shift()], [deck.shift()], [deck.shift()]];
-            game.players.forEach(p => { p.hand = deck.splice(0, 10).sort((a, b) => a - b); });
+            game.players.forEach(p => { p.hand = deck.splice(0,10).sort((a,b)=>a-b); });
             game.currentTurn = 1;
         }
     }
+
+    game.turnResolved = false; // pour le tour suivant
     await saveGame(game);
 };
 
 // --- Le reste du code (chat, copyLink, leaveGame, Card, render) reste identique ---
+
 const sendMessage = async () => {
     if (!state.chatMessage.trim()) return;
     const p = state.game.players.find(x => x.id === state.playerId);
@@ -325,6 +327,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (j) state.joinCode = j;
     render();
 });
-    </script>
+
+// --- Note: le reste du render() reste identique à ton code précédent ---
+
+</script>
 </body>
 </html>
