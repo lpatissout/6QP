@@ -1,114 +1,219 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>6 qui prend ! - Jeu en ligne</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>6 qui prend ! - Jeu en ligne (avec console spectateur)</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         // Supprimer l'avertissement Tailwind en production
         tailwind.config = { corePlugins: { preflight: true } };
     </script>
-    
+
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans:wght@400;600&display=swap');
         body { font-family: 'Open Sans', sans-serif; }
-        h1, h2, h3, h4 { font-family: 'Montserrat', sans-serif; }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .chat-container {
-            max-height: 300px;
-            overflow-y: auto;
-        }
+        h1,h2,h3,h4 { font-family: 'Montserrat', sans-serif; }
 
-        /* Spectator console styling */
+        /* Layout: main content + right console */
+        #page-wrap { margin-right: 25%; /* reserve space for side console */ }
         #spectator-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 25%;
+            height: 100vh;
+            background: #0b0b0b;
+            color: #b7f0a7;
+            border-left: 1px solid rgba(255,255,255,0.06);
+            z-index: 60;
+            display: flex;
+            flex-direction: column;
+        }
+        #spectator-header {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:8px;
+            padding:10px;
+            border-bottom:1px solid rgba(255,255,255,0.03);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        }
+        #spectator-console {
+            padding: 10px;
+            overflow-y: auto;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        .log-line { margin-bottom:6px; white-space:pre-wrap; word-break:break-word; }
+        .log-INFO { color: #b7f0a7; }    /* pale green */
+        .log-LOG  { color: #cfe7ff; }    /* pale blue */
+        .log-WARN { color: #ffd580; }    /* pale orange */
+        .log-ERROR{ color: #ff7a7a; }    /* pale red */
+        .log-TIME { color: #8f9bb3; font-size:11px; margin-right:6px; }
+
+        /* Controls */
+        .spec-btn { background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); padding:6px 8px; border-radius:6px; color:inherit; cursor:pointer; font-size:12px; }
+        .spec-btn.active { background: rgba(255,255,255,0.04); box-shadow: inset 0 -2px 0 rgba(0,0,0,0.4); }
+
+        /* Responsive: hide reserve on small screens */
+        @media (max-width: 900px) {
+            #page-wrap { margin-right: 0; }
+            #spectator-panel { width: 100%; height: 40vh; bottom:0; top:auto; right:0; left:0; display:flex; position:fixed; }
         }
     </style>
 </head>
 <body class="bg-gradient-to-br from-amber-100 to-orange-200 min-h-screen">
-    <div id="app"></div>
 
-    <!-- === CONSOLE SPECTATEUR (visible par tous) === -->
-    <div id="spectator-panel" class="fixed bottom-0 left-0 right-0 bg-black text-green-400 font-mono text-xs p-2 border-t border-gray-600 max-h-64 overflow-y-auto z-50" style="white-space: pre-wrap;">
-        <div id="spectator-console" aria-live="polite"></div>
+<!-- Main content wrapped so right side reserved for console -->
+<div id="page-wrap">
+    <div id="app"></div>
+</div>
+
+<!-- SPECTATOR PANEL (25% right side) -->
+<div id="spectator-panel" role="region" aria-label="Console spectateur">
+    <div id="spectator-header">
+        <div style="display:flex; gap:8px; align-items:center;">
+            <strong style="color:#fff;">Spectateur</strong>
+            <span style="font-size:12px; color:#9fb0c8;">(logs globaux)</span>
+        </div>
+
+        <div style="display:flex; gap:6px; align-items:center;">
+            <button id="filter-all" class="spec-btn active">All</button>
+            <button id="filter-log" class="spec-btn">Log</button>
+            <button id="filter-info" class="spec-btn">Info</button>
+            <button id="filter-warn" class="spec-btn">Warn</button>
+            <button id="filter-error" class="spec-btn">Error</button>
+            <button id="clear-logs" class="spec-btn" title="Clear logs">Clear</button>
+            <button id="download-logs" class="spec-btn" title="Télécharger les logs">Download</button>
+        </div>
     </div>
 
-    <!-- Bouton flottant pour afficher/masquer la console -->
-    <button id="toggleSpectator" class="fixed bottom-2 right-2 bg-gray-800 text-white px-3 py-1 rounded-lg text-xs opacity-90 hover:opacity-100 z-50">
-        👁 Spectateur
-    </button>
+    <div id="spectator-console" aria-live="polite" tabindex="0"></div>
+</div>
 
 <script>
-// ---------------- SPECTATOR CONSOLE (doit être défini avant tout log) ----------------
+// ---------------- SPECTATOR CONSOLE (global, captures console.*) ----------------
 (function(){
-    // sauvegarde du vrai console.log
-    if (!console._log) console._log = console.log.bind(console);
-
-    const spectatorConsole = {
-        logs: [],
-        maxLogs: 800,
-        elementId: 'spectator-console',
-        format: function(args) {
-            return args.map(a => {
-                try {
-                    if (typeof a === 'object') return JSON.stringify(a);
-                    return String(a);
-                } catch (e) {
-                    return '[object]';
-                }
-            }).join(' ');
-        },
-        push: function(level, ...args) {
-            const time = new Date().toLocaleTimeString();
-            const msg = this.format(args);
-            const line = `[${time}] ${level.toUpperCase()} ${msg}`;
-            this.logs.push(line);
-            if (this.logs.length > this.maxLogs) this.logs.shift();
-            const el = document.getElementById(this.elementId);
-            if (el) {
-                el.innerHTML = this.logs.map(l => `<div>${l}</div>`).join('');
-                el.scrollTop = el.scrollHeight;
-            }
-            // Forward to real console
-            console._log(level, ...args);
-        },
-        log: function(...args){ this.push('log', ...args); },
-        info: function(...args){ this.push('info', ...args); },
-        warn: function(...args){ this.push('warn', ...args); },
-        error: function(...args){ this.push('error', ...args); }
+    // Ensure an in-page log store
+    window.__spectator = window.__spectator || {
+        logs: [],   // {time, level, text}
+        max: 5000,
+        filter: 'all'
     };
 
-    // override global console methods
-    console.log = (...args) => spectatorConsole.log(...args);
-    console.info = (...args) => spectatorConsole.info(...args);
-    console.warn = (...args) => spectatorConsole.warn(...args);
-    console.error = (...args) => spectatorConsole.error(...args);
+    // helper formatting
+    function fmtArgs(args) {
+        return args.map(a => {
+            try {
+                if (typeof a === 'object') return JSON.stringify(a);
+                return String(a);
+            } catch (e) { return '[object]'; }
+        }).join(' ');
+    }
 
-    // expose for manual use if besoin
-    window.spectatorConsole = spectatorConsole;
+    // render function
+    function renderLogs() {
+        const container = document.getElementById('spectator-console');
+        if (!container) return;
+        const f = window.__spectator.filter;
+        const visible = window.__spectator.logs.filter(l => f === 'all' ? true : l.level === f.toUpperCase());
+        container.innerHTML = visible.map(l => {
+            const time = `<span class="log-TIME">[${l.time}]</span>`;
+            const level = `<span class="log-${l.level}">${l.level}</span>`;
+            const text = `<span class="log-${l.level}" style="margin-left:6px;">${l.text}</span>`;
+            return `<div class="log-line">${time} ${level} ${text}</div>`;
+        }).join('');
+        container.scrollTop = container.scrollHeight;
+    }
 
-    // toggle button
+    // push a log
+    function pushLog(level, ...args) {
+        const time = new Date().toLocaleTimeString();
+        const text = fmtArgs(args);
+        window.__spectator.logs.push({ time, level: level.toUpperCase(), text });
+        // keep within max
+        if (window.__spectator.logs.length > window.__spectator.max) window.__spectator.logs.shift();
+        renderLogs();
+        // keep forwarding to original console as well (to devtools)
+        if (originalConsole[level]) originalConsole[level].apply(console, args);
+    }
+
+    // save original console methods
+    const originalConsole = {
+        log: console.log.bind(console),
+        info: console.info.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console)
+    };
+
+    // override console methods
+    console.log = function(...args){ pushLog('log', ...args); };
+    console.info = function(...args){ pushLog('info', ...args); };
+    console.warn = function(...args){ pushLog('warn', ...args); };
+    console.error = function(...args){ pushLog('error', ...args); };
+
+    // Filters and controls
     document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('toggleSpectator');
-        const panel = document.getElementById('spectator-panel');
-        btn.addEventListener('click', () => {
-            panel.classList.toggle('hidden');
+        const btnAll = document.getElementById('filter-all');
+        const btnLog = document.getElementById('filter-log');
+        const btnInfo = document.getElementById('filter-info');
+        const btnWarn = document.getElementById('filter-warn');
+        const btnError = document.getElementById('filter-error');
+        const btnClear = document.getElementById('clear-logs');
+        const btnDownload = document.getElementById('download-logs');
+
+        function setActive(button) {
+            [btnAll, btnLog, btnInfo, btnWarn, btnError].forEach(b => b.classList.remove('active'));
+            if (button) button.classList.add('active');
+        }
+
+        btnAll.addEventListener('click', () => { window.__spectator.filter = 'all'; setActive(btnAll); renderLogs(); });
+        btnLog.addEventListener('click', () => { window.__spectator.filter = 'log'; setActive(btnLog); renderLogs(); });
+        btnInfo.addEventListener('click', () => { window.__spectator.filter = 'info'; setActive(btnInfo); renderLogs(); });
+        btnWarn.addEventListener('click', () => { window.__spectator.filter = 'warn'; setActive(btnWarn); renderLogs(); });
+        btnError.addEventListener('click', () => { window.__spectator.filter = 'error'; setActive(btnError); renderLogs(); });
+
+        btnClear.addEventListener('click', () => { window.__spectator.logs = []; renderLogs(); });
+
+        btnDownload.addEventListener('click', () => {
+            const text = window.__spectator.logs.map(l => `[${l.time}] ${l.level} ${l.text}`).join('\n');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `quiprend-logs-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
         });
+
+        // initial render
+        renderLogs();
     });
-})();
-// ---------------- FIN SPECTATOR CONSOLE ----------------
+
+    // expose utility to push custom structured logs
+    window.spectatorPush = function(level, ...args) {
+        if (!['log','info','warn','error'].includes(level)) level = 'log';
+        pushLog(level, ...args);
+    };
+
+})(); // end spectator
+// ---------------- END SPECTATOR ----------------
 </script>
 
 <script>
+/* ------------------ Jeu (ton code) ------------------ */
+/* J'ai intégré ici tout ton code existant mais en gardant/ajoutant des console.log pertinents.
+   Les console.log seront automatiquement capturés et affichés dans la console latérale. */
+
 const firebaseConfig = {
   apiKey: "AIzaSyC2YfNviAE_jDD0wT7TmfZBeOaKqjJdJuQ",
   authDomain: "quiprend-879a6.firebaseapp.com",
@@ -124,7 +229,7 @@ let database = null;
 try {
     firebase.initializeApp(firebaseConfig);
     database = firebase.database();
-    console.log('Firebase initialized ✅', { projectId: firebaseConfig.projectId });
+    console.info('Firebase initialized', { projectId: firebaseConfig.projectId });
 } catch (e) {
     console.error('Erreur Firebase: ', e);
     alert('Erreur Firebase: ' + e.message);
@@ -175,12 +280,10 @@ const saveGame = async (data) => {
         console.warn('saveGame abort: database not initialized');
         return;
     }
-    
-    // Nettoyer les undefined en les remplaçant par null
+
     if (data.pendingCard === undefined) data.pendingCard = null;
     if (data.waitingForRowChoice === undefined) data.waitingForRowChoice = null;
-    
-    // Vérifier qu'il n'y a pas d'undefined dans les rows
+
     if (data.rows && data.rows.length > 0) {
         for (let i = 0; i < data.rows.length; i++) {
             for (let j = 0; j < data.rows[i].length; j++) {
@@ -192,12 +295,12 @@ const saveGame = async (data) => {
             }
         }
     }
-    
+
     try {
-        console.log('Saving to Firebase', { gameCode: state.gameCode, rowsCount: data.rows ? data.rows.map(r=>r.length) : null });
+        console.log('Saving to Firebase', { gameCode: state.gameCode, rowsCount: data.rows ? data.rows.map(r => r.length) : null });
         await database.ref('games/' + state.gameCode).set(data);
         state.game = data;
-        console.log('Save completed for game', state.gameCode);
+        console.info('Save completed for game', state.gameCode);
     } catch (err) {
         console.error('Erreur lors de la sauvegarde Firebase:', err);
     }
@@ -216,25 +319,22 @@ const subscribeToGame = (code) => {
             console.warn('subscribeToGame: game not found', code);
             return;
         }
-        
-        console.log('Firebase update received', { status: data.status, screen: state.screen, gameCode: code });
-        
+
+        console.info('Firebase update received', { status: data.status, screen: state.screen, gameCode: code });
+
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
-        // Forcer le passage à l'écran de jeu pour TOUS les joueurs
         if (data.status === 'playing') {
-            console.log('Game status is playing -> switch to game screen');
+            console.info('Game status is playing -> switching to game screen', { gameCode: code });
             state.screen = 'game';
         }
 
-        // Résoudre le tour SEULEMENT si ce n'est pas nous qui venons de démarrer et si toutes les cartes sont jouées
+        // When all players have played and turn isn't resolved, resolve
         if (state.game.status === 'playing' && !state.game.turnResolved && oldStatus === 'playing') {
             const allPlayed = state.game.players.every(p => p.playedCard !== null);
-            console.log('Checking allPlayed for resolveTurn:', { allPlayed });
-            if (allPlayed) {
-                await resolveTurn();
-            }
+            console.log('Checking if all have played', { allPlayed });
+            if (allPlayed) await resolveTurn();
         }
 
         render();
@@ -246,13 +346,13 @@ const createGame = async () => {
         alert('Entrez un pseudo !');
         return;
     }
-    
+
     const code = generateGameCode();
     const pid = Math.random().toString(36).substring(7);
-    
+
     state.gameCode = code;
     state.playerId = pid;
-    
+
     const initialGame = {
         code,
         status: 'waiting',
@@ -275,9 +375,9 @@ const createGame = async () => {
         pendingCard: null
     };
 
-    console.log('Creating game', { code, host: state.playerName, hostId: pid });
+    console.info('Creating game', { code, host: state.playerName, hostId: pid });
     await saveGame(initialGame);
-    
+
     subscribeToGame(code);
     state.screen = 'lobby';
     render();
@@ -288,12 +388,12 @@ const joinGame = async () => {
         alert('Entrez pseudo et code !');
         return;
     }
-    
+
     const normalized = state.joinCode.toUpperCase();
-    console.log('Attempting to join game', { joinCode: normalized, player: state.playerName });
+    console.info('Attempting to join game', { joinCode: normalized, player: state.playerName });
     const snap = await database.ref('games/' + normalized).once('value');
     const game = snap.val();
-    
+
     if (!game) {
         console.warn('Partie introuvable', normalized);
         alert('Partie introuvable !');
@@ -304,7 +404,7 @@ const joinGame = async () => {
         alert('Partie déjà commencée !');
         return;
     }
-    
+
     const pid = Math.random().toString(36).substring(7);
     const newPlayer = {
         id: pid,
@@ -318,7 +418,7 @@ const joinGame = async () => {
 
     state.gameCode = normalized;
     state.playerId = pid;
-    console.log('Joining game success', { gameCode: normalized, playerId: pid, playerName: state.playerName });
+    console.info('Joining game success', { gameCode: normalized, playerId: pid, playerName: state.playerName });
     await saveGame(game);
     subscribeToGame(state.gameCode);
     state.screen = 'lobby';
@@ -345,13 +445,13 @@ const startGame = async () => {
 
     try {
         const deck = shuffleDeck();
-        console.log('Deck created', { length: deck.length, preview: deck.slice(0, 12) });
-        
+        console.info('Deck created', { length: deck.length, preview: deck.slice(0, 12) });
+
         const cardsNeeded = 4 + (state.game.players.length * 10);
         if (deck.length < cardsNeeded) {
             throw new Error(`Pas assez de cartes! Besoin: ${cardsNeeded}, Disponible: ${deck.length}`);
         }
-        
+
         state.game.rows = [
             [deck[0]],
             [deck[1]],
@@ -359,13 +459,13 @@ const startGame = async () => {
             [deck[3]]
         ];
         deck.splice(0, 4);
-        
+
         state.game.players.forEach(p => {
             p.hand = deck.splice(0, 10).sort((a, b) => a - b);
             p.playedCard = null;
             console.log('Dealt hand to player', { player: p.name, hand: p.hand });
         });
-        
+
         state.game.status = 'playing';
         state.game.round = 1;
         state.game.currentTurn = 1;
@@ -373,7 +473,7 @@ const startGame = async () => {
         state.game.waitingForRowChoice = null;
         state.game.pendingCard = null;
 
-        console.log('Game starting', { gameCode: state.gameCode, round: state.game.round, currentTurn: state.game.currentTurn, rows: state.game.rows });
+        console.info('Game starting', { gameCode: state.gameCode, round: state.game.round, currentTurn: state.game.currentTurn, rows: state.game.rows });
         await saveGame(state.game);
         state.screen = 'game';
         render();
@@ -390,7 +490,7 @@ const playCard = async (card) => {
         console.warn('playCard: already played', p.name);
         return;
     }
-    
+
     p.playedCard = card;
     p.hand = p.hand.filter(c => c !== card);
     console.log('Player played card', { player: p.name, card });
@@ -400,7 +500,7 @@ const playCard = async (card) => {
 };
 
 const resolveTurn = async () => {
-    console.log('resolveTurn called for game', state.gameCode);
+    console.info('resolveTurn called for game', state.gameCode);
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
     if (!game) { console.warn('resolveTurn: game not found'); return; }
@@ -410,22 +510,19 @@ const resolveTurn = async () => {
 
     console.log('Plays sorted for resolution', plays);
 
-    // Vérifier s'il y a besoin d'un choix de rangée
     for (const play of plays) {
         const validRows = game.rows.map((r, i) => ({ i, last: r[r.length-1], diff: play.card - r[r.length-1] })).filter(x => x.diff > 0);
         console.log('Checking validRows for', play, { validRows });
         if (!validRows.length) {
-            // Le joueur doit choisir une rangée
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
             await saveGame(game);
-            console.log('Need player to choose row', { playerId: play.pid, card: play.card });
-            return; // Arrêter ici et attendre le choix
+            console.info('Need player to choose row', { playerId: play.pid, card: play.card });
+            return;
         }
     }
 
-    // Si aucun choix n'est nécessaire, résoudre normalement
     await resolveAllPlays(game);
 };
 
@@ -443,14 +540,14 @@ const resolveAllPlays = async (game) => {
         console.log('Player', p.name, 'validRows:', validRows);
 
         if (!validRows.length) {
-            console.log('Player needs to choose a row:', p.name, play.card);
+            console.info('Player needs to choose a row:', p.name, play.card);
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
             await saveGame(game);
             return;
         }
-        
+
         const chosenRow = validRows.reduce((min, cur) => cur.diff < min.diff ? cur : min);
         console.log('ChosenRow for', p.name, { chosenRowIndex: chosenRow.i, diff: chosenRow.diff });
 
@@ -458,40 +555,40 @@ const resolveAllPlays = async (game) => {
             const penaltyRow = game.rows[chosenRow.i];
             const penaltyPoints = penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
             p.score += penaltyPoints;
-            console.log('Player', p.name, 'took row', chosenRow.i, 'and got penalty', penaltyPoints);
+            console.warn('Player', p.name, 'took row', chosenRow.i, 'and got penalty', penaltyPoints);
             game.rows[chosenRow.i] = [play.card];
         } else {
             game.rows[chosenRow.i].push(play.card);
             console.log('Player', p.name, 'placed card on row', chosenRow.i, 'row now length', game.rows[chosenRow.i].length);
         }
-        
+
         p.playedCard = null;
     }
 
-    console.log('All plays resolved, advancing turn');
-    
+    console.info('All plays resolved, advancing turn');
+
     game.currentTurn++;
     if (game.currentTurn > 10) {
         game.round++;
-        console.log('End of round reached, incrementing round to', game.round);
+        console.info('End of round reached, incrementing round to', game.round);
         if (game.round > game.maxRounds) {
             game.status = 'finished';
-            console.log('Game finished', { gameCode: state.gameCode });
+            console.info('Game finished', { gameCode: state.gameCode });
         } else {
             const deck = shuffleDeck();
             game.rows = [
-                [deck[0]], 
-                [deck[1]], 
-                [deck[2]], 
+                [deck[0]],
+                [deck[1]],
+                [deck[2]],
                 [deck[3]]
             ];
             deck.splice(0, 4);
-            game.players.forEach(p => { 
-                p.hand = deck.splice(0, 10).sort((a,b)=>a-b);
+            game.players.forEach(p => {
+                p.hand = deck.splice(0, 10).sort((a, b) => a - b);
                 console.log('New hand dealt to', p.name, p.hand);
             });
             game.currentTurn = 1;
-            console.log('New round started', { round: game.round });
+            console.info('New round started', { round: game.round });
         }
     }
 
@@ -524,7 +621,7 @@ const copyLink = () => {
 
 const leaveGame = () => {
     if (gameRef) gameRef.off();
-    console.log('Player leaving game', { playerId: state.playerId, gameCode: state.gameCode });
+    console.info('Player leaving game', { playerId: state.playerId, gameCode: state.gameCode });
     state.screen = 'home';
     state.game = null;
     state.gameCode = '';
@@ -536,30 +633,26 @@ const chooseRow = async (rowIndex) => {
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
     console.log('Current waitingForRowChoice:', game ? game.waitingForRowChoice : null, 'My ID:', state.playerId);
-    
+
     if (!game || game.waitingForRowChoice !== state.playerId) {
         console.warn('Not authorized to choose or no game state available');
         return;
     }
-    
+
     const p = game.players.find(x => x.id === state.playerId);
     const penaltyRow = game.rows[rowIndex];
     const penaltyPoints = penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
     p.score += penaltyPoints;
-    console.log('Player picked up row', { player: p.name, rowIndex, penaltyCards: penaltyRow, penaltyPoints });
+    console.warn('Player picked up row', { player: p.name, rowIndex, penaltyCards: penaltyRow, penaltyPoints });
 
-    // Remplacer la rangée par la carte en attente
     game.rows[rowIndex] = [game.pendingCard];
     console.log('Row replaced with pendingCard', { rowIndex, pendingCard: game.pendingCard });
 
-    // Marquer que la carte a été jouée
     p.playedCard = null;
-    
-    // Continuer la résolution du tour
+
     await resolveAllPlays(game);
 };
 
-// Exposer la fonction globalement pour qu'elle soit accessible depuis le HTML
 window.chooseRow = chooseRow;
 
 const Card = (num, sel, click, dis, small) => {
@@ -576,33 +669,32 @@ window.handleCard = (c) => {
     if (state.selectedCard === c) {
         console.log('Card confirmed, playing', { player: p.name, card: c });
         playCard(c);
-    }
-    else {
+    } else {
         state.selectedCard = c;
         console.log('Card selected', { player: p.name, selectedCard: c });
         render();
     }
 };
 
-// FONCTION RENDER
+// RENDER - comme auparavant
 const render = () => {
     const app = document.getElementById('app');
-    
-    // ÉCRAN D'ACCUEIL
+
+    // HOME
     if (state.screen === 'home') {
         app.innerHTML = `
             <div class="container mx-auto px-4 py-8">
                 <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8">
                     <h1 class="text-5xl font-bold text-center mb-2 text-orange-600">🐮 6 qui prend !</h1>
                     <p class="text-center text-gray-600 mb-8">Jeu de cartes multijoueur en ligne</p>
-                    
+
                     <div class="mb-6">
                         <label class="block text-sm font-semibold mb-2">Votre pseudo</label>
                         <input type="text" value="${state.playerName}" oninput="state.playerName=this.value" 
                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
                                placeholder="Entrez votre nom">
                     </div>
-                    
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <button onclick="createGame()" 
                                 class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
@@ -613,7 +705,7 @@ const render = () => {
                             🔗 Rejoindre une partie
                         </button>
                     </div>
-                    
+
                     <div class="bg-amber-50 p-4 rounded-lg">
                         <h3 class="font-bold mb-2">📖 Règles rapides :</h3>
                         <ul class="text-sm space-y-1 text-gray-700">
@@ -627,26 +719,26 @@ const render = () => {
             </div>
         `;
     }
-    
-    // ÉCRAN REJOINDRE
+
+    // JOIN
     else if (state.screen === 'join') {
         app.innerHTML = `
             <div class="container mx-auto px-4 py-8">
                 <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8">
                     <h2 class="text-3xl font-bold text-center mb-6 text-blue-600">Rejoindre une partie</h2>
-                    
+
                     <div class="mb-6">
                         <label class="block text-sm font-semibold mb-2">Code de la partie</label>
                         <input type="text" value="${state.joinCode}" oninput="state.joinCode=this.value.toUpperCase()" 
                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none uppercase"
                                placeholder="Ex: ABC123">
                     </div>
-                    
+
                     <button onclick="joinGame()" 
                             class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg mb-4">
                         Rejoindre
                     </button>
-                    
+
                     <button onclick="state.screen='home'; render()" 
                             class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg transition">
                         Retour
@@ -655,12 +747,12 @@ const render = () => {
             </div>
         `;
     }
-    
-    // ÉCRAN LOBBY
+
+    // LOBBY
     else if (state.screen === 'lobby') {
         const isHost = state.game.hostId === state.playerId;
         const canStart = isHost && state.game.players.length >= 2 && state.game.players.every(p => p.ready);
-        
+
         app.innerHTML = `
             <div class="container mx-auto px-4 py-8">
                 <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl p-8">
@@ -670,7 +762,7 @@ const render = () => {
                             Quitter
                         </button>
                     </div>
-                    
+
                     <div class="bg-amber-50 p-4 rounded-lg mb-6 flex justify-between items-center">
                         <div>
                             <span class="text-sm text-gray-600">Code de la partie :</span>
@@ -680,7 +772,7 @@ const render = () => {
                             ${state.copied ? '✓ Copié !' : '📋 Copier le lien'}
                         </button>
                     </div>
-                    
+
                     <div class="mb-6">
                         <h3 class="font-bold mb-3">Joueurs (${state.game.players.length}) :</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -695,7 +787,7 @@ const render = () => {
                             `).join('')}
                         </div>
                     </div>
-                    
+
                     <div class="flex gap-4">
                         <button onclick="toggleReady()" 
                                 class="flex-1 ${state.game.players.find(x => x.id === state.playerId).ready ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'} text-white font-bold py-3 px-6 rounded-lg transition">
@@ -708,18 +800,18 @@ const render = () => {
                             </button>
                         ` : ''}
                     </div>
-                    
+
                     ${!canStart && isHost ? '<p class="text-center text-red-500 mt-2 text-sm">Tous les joueurs doivent être prêts (min. 2 joueurs)</p>' : ''}
                 </div>
             </div>
         `;
     }
-    
-    // ÉCRAN DE JEU
+
+    // GAME
     else if (state.screen === 'game') {
         const me = state.game.players.find(x => x.id === state.playerId);
         const waitingPlayers = state.game.players.filter(p => p.playedCard === null).map(p => p.name);
-        
+
         if (state.game.status === 'finished') {
             const winner = state.game.players.reduce((min, p) => p.score < min.score ? p : min);
             app.innerHTML = `
@@ -727,7 +819,7 @@ const render = () => {
                     <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
                         <h1 class="text-5xl font-bold mb-6 text-green-600">🎉 Partie terminée !</h1>
                         <h2 class="text-3xl mb-8">🏆 ${winner.name} gagne avec ${winner.score} points !</h2>
-                        
+
                         <div class="mb-8">
                             <h3 class="font-bold mb-4">Classement final :</h3>
                             ${state.game.players.sort((a, b) => a.score - b.score).map((p, i) => `
@@ -737,7 +829,7 @@ const render = () => {
                                 </div>
                             `).join('')}
                         </div>
-                        
+
                         <button onclick="leaveGame()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg">
                             Retour à l'accueil
                         </button>
@@ -746,7 +838,7 @@ const render = () => {
             `;
             return;
         }
-        
+
         app.innerHTML = `
             <div class="container mx-auto px-4 py-4">
                 <div class="max-w-6xl mx-auto">
@@ -760,7 +852,7 @@ const render = () => {
                             Quitter
                         </button>
                     </div>
-                    
+
                     <!-- Scores -->
                     <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
                         <div class="grid grid-cols-2 md:grid-cols-${state.game.players.length} gap-2">
@@ -773,8 +865,8 @@ const render = () => {
                             `).join('')}
                         </div>
                     </div>
-                    
-                    <!-- Rangées -->
+
+                    <!-- Rows -->
                     <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
                         <h3 class="font-bold mb-4 text-lg">Rangées de cartes :</h3>
                         ${state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId ? 
@@ -797,8 +889,8 @@ const render = () => {
                             `}).join('')}
                         </div>
                     </div>
-                    
-                    <!-- Main du joueur -->
+
+                    <!-- Player hand -->
                     <div class="bg-white rounded-lg shadow-lg p-6">
                         <h3 class="font-bold mb-4 text-lg">Votre main :</h3>
                         ${me.playedCard ? `
@@ -824,10 +916,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const p = new URLSearchParams(window.location.search);
     const j = p.get('join');
     if (j) state.joinCode = j;
-    console.log('App loaded', { joinParam: j });
+    console.info('App loaded', { joinParam: j });
     render();
 });
-
 </script>
 </body>
 </html>
