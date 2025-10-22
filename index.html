@@ -27,10 +27,86 @@
             max-height: 300px;
             overflow-y: auto;
         }
+
+        /* Spectator console styling */
+        #spectator-panel {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-amber-100 to-orange-200 min-h-screen">
     <div id="app"></div>
+
+    <!-- === CONSOLE SPECTATEUR (visible par tous) === -->
+    <div id="spectator-panel" class="fixed bottom-0 left-0 right-0 bg-black text-green-400 font-mono text-xs p-2 border-t border-gray-600 max-h-64 overflow-y-auto z-50" style="white-space: pre-wrap;">
+        <div id="spectator-console" aria-live="polite"></div>
+    </div>
+
+    <!-- Bouton flottant pour afficher/masquer la console -->
+    <button id="toggleSpectator" class="fixed bottom-2 right-2 bg-gray-800 text-white px-3 py-1 rounded-lg text-xs opacity-90 hover:opacity-100 z-50">
+        👁 Spectateur
+    </button>
+
+<script>
+// ---------------- SPECTATOR CONSOLE (doit être défini avant tout log) ----------------
+(function(){
+    // sauvegarde du vrai console.log
+    if (!console._log) console._log = console.log.bind(console);
+
+    const spectatorConsole = {
+        logs: [],
+        maxLogs: 800,
+        elementId: 'spectator-console',
+        format: function(args) {
+            return args.map(a => {
+                try {
+                    if (typeof a === 'object') return JSON.stringify(a);
+                    return String(a);
+                } catch (e) {
+                    return '[object]';
+                }
+            }).join(' ');
+        },
+        push: function(level, ...args) {
+            const time = new Date().toLocaleTimeString();
+            const msg = this.format(args);
+            const line = `[${time}] ${level.toUpperCase()} ${msg}`;
+            this.logs.push(line);
+            if (this.logs.length > this.maxLogs) this.logs.shift();
+            const el = document.getElementById(this.elementId);
+            if (el) {
+                el.innerHTML = this.logs.map(l => `<div>${l}</div>`).join('');
+                el.scrollTop = el.scrollHeight;
+            }
+            // Forward to real console
+            console._log(level, ...args);
+        },
+        log: function(...args){ this.push('log', ...args); },
+        info: function(...args){ this.push('info', ...args); },
+        warn: function(...args){ this.push('warn', ...args); },
+        error: function(...args){ this.push('error', ...args); }
+    };
+
+    // override global console methods
+    console.log = (...args) => spectatorConsole.log(...args);
+    console.info = (...args) => spectatorConsole.info(...args);
+    console.warn = (...args) => spectatorConsole.warn(...args);
+    console.error = (...args) => spectatorConsole.error(...args);
+
+    // expose for manual use if besoin
+    window.spectatorConsole = spectatorConsole;
+
+    // toggle button
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('toggleSpectator');
+        const panel = document.getElementById('spectator-panel');
+        btn.addEventListener('click', () => {
+            panel.classList.toggle('hidden');
+        });
+    });
+})();
+// ---------------- FIN SPECTATOR CONSOLE ----------------
+</script>
 
 <script>
 const firebaseConfig = {
@@ -48,8 +124,9 @@ let database = null;
 try {
     firebase.initializeApp(firebaseConfig);
     database = firebase.database();
-    console.log('✅ Firebase OK');
+    console.log('Firebase initialized ✅', { projectId: firebaseConfig.projectId });
 } catch (e) {
+    console.error('Erreur Firebase: ', e);
     alert('Erreur Firebase: ' + e.message);
 }
 
@@ -94,7 +171,10 @@ const shuffleDeck = () => {
 };
 
 const saveGame = async (data) => {
-    if (!database) return;
+    if (!database) {
+        console.warn('saveGame abort: database not initialized');
+        return;
+    }
     
     // Nettoyer les undefined en les remplaçant par null
     if (data.pendingCard === undefined) data.pendingCard = null;
@@ -113,34 +193,45 @@ const saveGame = async (data) => {
         }
     }
     
-    console.log('Saving to Firebase:', JSON.stringify(data.rows));
-    await database.ref('games/' + state.gameCode).set(data);
-    state.game = data;
+    try {
+        console.log('Saving to Firebase', { gameCode: state.gameCode, rowsCount: data.rows ? data.rows.map(r=>r.length) : null });
+        await database.ref('games/' + state.gameCode).set(data);
+        state.game = data;
+        console.log('Save completed for game', state.gameCode);
+    } catch (err) {
+        console.error('Erreur lors de la sauvegarde Firebase:', err);
+    }
 };
 
 const subscribeToGame = (code) => {
-    if (!database) return;
+    if (!database) {
+        console.warn('subscribeToGame abort: database not initialized');
+        return;
+    }
     if (gameRef) gameRef.off();
     gameRef = database.ref('games/' + code);
     gameRef.on('value', async (snap) => {
         const data = snap.val();
-        if (!data) return;
+        if (!data) {
+            console.warn('subscribeToGame: game not found', code);
+            return;
+        }
         
-        console.log('Firebase update received:', data.status, 'Current screen:', state.screen);
+        console.log('Firebase update received', { status: data.status, screen: state.screen, gameCode: code });
         
-        // NE PAS ÉCRASER state.game avant de vérifier
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
-        // CORRECTION RENFORCÉE : Forcer le passage à l'écran de jeu pour TOUS les joueurs
+        // Forcer le passage à l'écran de jeu pour TOUS les joueurs
         if (data.status === 'playing') {
-            console.log('Game is playing, switching to game screen');
+            console.log('Game status is playing -> switch to game screen');
             state.screen = 'game';
         }
 
-        // Résoudre le tour SEULEMENT si ce n'est pas nous qui venons de démarrer
+        // Résoudre le tour SEULEMENT si ce n'est pas nous qui venons de démarrer et si toutes les cartes sont jouées
         if (state.game.status === 'playing' && !state.game.turnResolved && oldStatus === 'playing') {
             const allPlayed = state.game.players.every(p => p.playedCard !== null);
+            console.log('Checking allPlayed for resolveTurn:', { allPlayed });
             if (allPlayed) {
                 await resolveTurn();
             }
@@ -162,7 +253,7 @@ const createGame = async () => {
     state.gameCode = code;
     state.playerId = pid;
     
-    await saveGame({
+    const initialGame = {
         code,
         status: 'waiting',
         hostId: pid,
@@ -182,7 +273,10 @@ const createGame = async () => {
         turnResolved: false,
         waitingForRowChoice: null,
         pendingCard: null
-    });
+    };
+
+    console.log('Creating game', { code, host: state.playerName, hostId: pid });
+    await saveGame(initialGame);
     
     subscribeToGame(code);
     state.screen = 'lobby';
@@ -195,30 +289,36 @@ const joinGame = async () => {
         return;
     }
     
-    const snap = await database.ref('games/' + state.joinCode.toUpperCase()).once('value');
+    const normalized = state.joinCode.toUpperCase();
+    console.log('Attempting to join game', { joinCode: normalized, player: state.playerName });
+    const snap = await database.ref('games/' + normalized).once('value');
     const game = snap.val();
     
     if (!game) {
+        console.warn('Partie introuvable', normalized);
         alert('Partie introuvable !');
         return;
     }
     if (game.status !== 'waiting') {
+        console.warn('Partie déjà commencée', normalized);
         alert('Partie déjà commencée !');
         return;
     }
     
     const pid = Math.random().toString(36).substring(7);
-    game.players.push({
+    const newPlayer = {
         id: pid,
         name: state.playerName,
         score: 0,
         ready: false,
         hand: [],
         playedCard: null
-    });
+    };
+    game.players.push(newPlayer);
 
-    state.gameCode = state.joinCode.toUpperCase();
+    state.gameCode = normalized;
     state.playerId = pid;
+    console.log('Joining game success', { gameCode: normalized, playerId: pid, playerName: state.playerName });
     await saveGame(game);
     subscribeToGame(state.gameCode);
     state.screen = 'lobby';
@@ -227,12 +327,17 @@ const joinGame = async () => {
 
 const toggleReady = async () => {
     const p = state.game.players.find(x => x.id === state.playerId);
+    if (!p) { console.warn('toggleReady: player not found', state.playerId); return; }
     p.ready = !p.ready;
+    console.log('Toggling ready', { player: p.name, ready: p.ready });
     await saveGame(state.game);
 };
 
 const startGame = async () => {
-    if (state.game.hostId !== state.playerId || state.game.players.length < 2) return;
+    if (state.game.hostId !== state.playerId || state.game.players.length < 2) {
+        console.warn('startGame unauthorized or not enough players', { hostId: state.game.hostId, me: state.playerId, players: state.game.players.length });
+        return;
+    }
     if (!state.game.players.every(p => p.ready)) {
         alert('Tous doivent être prêts !');
         return;
@@ -240,29 +345,25 @@ const startGame = async () => {
 
     try {
         const deck = shuffleDeck();
-        console.log('Deck created, length:', deck.length, 'First cards:', deck.slice(0, 10));
+        console.log('Deck created', { length: deck.length, preview: deck.slice(0, 12) });
         
-        // Vérifier que le deck a assez de cartes
         const cardsNeeded = 4 + (state.game.players.length * 10);
         if (deck.length < cardsNeeded) {
             throw new Error(`Pas assez de cartes! Besoin: ${cardsNeeded}, Disponible: ${deck.length}`);
         }
         
-        // Créer les 4 rangées avec la première carte de chaque
         state.game.rows = [
-            [deck[0]], 
-            [deck[1]], 
-            [deck[2]], 
+            [deck[0]],
+            [deck[1]],
+            [deck[2]],
             [deck[3]]
         ];
-        
-        // Retirer les 4 premières cartes du deck
         deck.splice(0, 4);
         
-        // Distribuer 10 cartes à chaque joueur
         state.game.players.forEach(p => {
             p.hand = deck.splice(0, 10).sort((a, b) => a - b);
             p.playedCard = null;
+            console.log('Dealt hand to player', { player: p.name, hand: p.hand });
         });
         
         state.game.status = 'playing';
@@ -272,8 +373,7 @@ const startGame = async () => {
         state.game.waitingForRowChoice = null;
         state.game.pendingCard = null;
 
-        console.log('Game state before save - waitingForRowChoice:', state.game.waitingForRowChoice, 'pendingCard:', state.game.pendingCard);
-        console.log('Game data before save:', JSON.stringify(state.game.rows));
+        console.log('Game starting', { gameCode: state.gameCode, round: state.game.round, currentTurn: state.game.currentTurn, rows: state.game.rows });
         await saveGame(state.game);
         state.screen = 'game';
         render();
@@ -285,33 +385,42 @@ const startGame = async () => {
 
 const playCard = async (card) => {
     const p = state.game.players.find(x => x.id === state.playerId);
-    if (p.playedCard) return;
+    if (!p) { console.warn('playCard: player not found', state.playerId); return; }
+    if (p.playedCard) {
+        console.warn('playCard: already played', p.name);
+        return;
+    }
     
     p.playedCard = card;
     p.hand = p.hand.filter(c => c !== card);
+    console.log('Player played card', { player: p.name, card });
     await saveGame(state.game);
     state.selectedCard = null;
     render();
 };
 
 const resolveTurn = async () => {
+    console.log('resolveTurn called for game', state.gameCode);
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
-    if (!game) return;
+    if (!game) { console.warn('resolveTurn: game not found'); return; }
 
     game.turnResolved = true;
-    const plays = game.players.map(p => ({ pid: p.id, card: p.playedCard })).sort((a, b) => a.card - b.card);
+    const plays = game.players.map(p => ({ pid: p.id, card: p.playedCard, name: p.name })).filter(x => x.card !== null).sort((a, b) => a.card - b.card);
+
+    console.log('Plays sorted for resolution', plays);
 
     // Vérifier s'il y a besoin d'un choix de rangée
     for (const play of plays) {
         const validRows = game.rows.map((r, i) => ({ i, last: r[r.length-1], diff: play.card - r[r.length-1] })).filter(x => x.diff > 0);
-        
+        console.log('Checking validRows for', play, { validRows });
         if (!validRows.length) {
             // Le joueur doit choisir une rangée
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
             await saveGame(game);
+            console.log('Need player to choose row', { playerId: play.pid, card: play.card });
             return; // Arrêter ici et attendre le choix
         }
     }
@@ -322,35 +431,38 @@ const resolveTurn = async () => {
 
 const resolveAllPlays = async (game) => {
     const plays = game.players
-        .filter(p => p.playedCard !== null) // Filtrer seulement les cartes non encore résolues
-        .map(p => ({ pid: p.id, card: p.playedCard }))
+        .filter(p => p.playedCard !== null)
+        .map(p => ({ pid: p.id, card: p.playedCard, name: p.name }))
         .sort((a, b) => a.card - b.card);
 
-    console.log('Resolving plays:', plays);
+    console.log('resolveAllPlays start', { plays });
 
     for (const play of plays) {
         const p = game.players.find(x => x.id === play.pid);
         const validRows = game.rows.map((r, i) => ({ i, last: r[r.length-1], diff: play.card - r[r.length-1] })).filter(x => x.diff > 0);
+        console.log('Player', p.name, 'validRows:', validRows);
 
         if (!validRows.length) {
-            // Ce joueur doit aussi choisir une rangée
-            console.log('Player', p.name, 'needs to choose a row for card', play.card);
+            console.log('Player needs to choose a row:', p.name, play.card);
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
             await saveGame(game);
-            return; // Arrêter et attendre le choix
+            return;
         }
         
         const chosenRow = validRows.reduce((min, cur) => cur.diff < min.diff ? cur : min);
+        console.log('ChosenRow for', p.name, { chosenRowIndex: chosenRow.i, diff: chosenRow.diff });
+
         if (game.rows[chosenRow.i].length === 5) {
             const penaltyRow = game.rows[chosenRow.i];
-            p.score += penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
-            console.log('Player', p.name, 'took row', chosenRow.i, 'automatically (6th card rule)');
+            const penaltyPoints = penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
+            p.score += penaltyPoints;
+            console.log('Player', p.name, 'took row', chosenRow.i, 'and got penalty', penaltyPoints);
             game.rows[chosenRow.i] = [play.card];
         } else {
             game.rows[chosenRow.i].push(play.card);
-            console.log('Player', p.name, 'placed card on row', chosenRow.i);
+            console.log('Player', p.name, 'placed card on row', chosenRow.i, 'row now length', game.rows[chosenRow.i].length);
         }
         
         p.playedCard = null;
@@ -361,8 +473,11 @@ const resolveAllPlays = async (game) => {
     game.currentTurn++;
     if (game.currentTurn > 10) {
         game.round++;
-        if (game.round > game.maxRounds) game.status = 'finished';
-        else {
+        console.log('End of round reached, incrementing round to', game.round);
+        if (game.round > game.maxRounds) {
+            game.status = 'finished';
+            console.log('Game finished', { gameCode: state.gameCode });
+        } else {
             const deck = shuffleDeck();
             game.rows = [
                 [deck[0]], 
@@ -373,8 +488,10 @@ const resolveAllPlays = async (game) => {
             deck.splice(0, 4);
             game.players.forEach(p => { 
                 p.hand = deck.splice(0, 10).sort((a,b)=>a-b);
+                console.log('New hand dealt to', p.name, p.hand);
             });
             game.currentTurn = 1;
+            console.log('New round started', { round: game.round });
         }
     }
 
@@ -388,21 +505,26 @@ const sendMessage = async () => {
     if (!state.chatMessage.trim()) return;
     const p = state.game.players.find(x => x.id === state.playerId);
     state.game.chat = state.game.chat || [];
-    state.game.chat.push({ player: p.name, msg: state.chatMessage, time: new Date().toLocaleTimeString() });
+    const entry = { player: p.name, msg: state.chatMessage, time: new Date().toLocaleTimeString() };
+    state.game.chat.push(entry);
+    console.log('Chat message sent', entry);
     state.chatMessage = '';
     await saveGame(state.game);
     render();
 };
 
 const copyLink = () => {
-    navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?join=' + state.gameCode);
+    const link = window.location.origin + window.location.pathname + '?join=' + state.gameCode;
+    navigator.clipboard.writeText(link);
     state.copied = true;
+    console.log('Link copied to clipboard', link);
     render();
     setTimeout(() => { state.copied = false; render(); }, 2000);
 };
 
 const leaveGame = () => {
     if (gameRef) gameRef.off();
+    console.log('Player leaving game', { playerId: state.playerId, gameCode: state.gameCode });
     state.screen = 'home';
     state.game = null;
     state.gameCode = '';
@@ -410,26 +532,26 @@ const leaveGame = () => {
 };
 
 const chooseRow = async (rowIndex) => {
-    console.log('chooseRow called with index:', rowIndex);
+    console.log('chooseRow called', { rowIndex, myId: state.playerId });
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
-    console.log('Current game state:', game.waitingForRowChoice, 'My ID:', state.playerId);
+    console.log('Current waitingForRowChoice:', game ? game.waitingForRowChoice : null, 'My ID:', state.playerId);
     
     if (!game || game.waitingForRowChoice !== state.playerId) {
-        console.log('Not authorized to choose or no game');
+        console.warn('Not authorized to choose or no game state available');
         return;
     }
     
-    // Le joueur ramasse la rangée
     const p = game.players.find(x => x.id === state.playerId);
     const penaltyRow = game.rows[rowIndex];
-    p.score += penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
-    
-    console.log('Player picked up row', rowIndex, 'with', penaltyRow.length, 'cards');
-    
+    const penaltyPoints = penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
+    p.score += penaltyPoints;
+    console.log('Player picked up row', { player: p.name, rowIndex, penaltyCards: penaltyRow, penaltyPoints });
+
     // Remplacer la rangée par la carte en attente
     game.rows[rowIndex] = [game.pendingCard];
-    
+    console.log('Row replaced with pendingCard', { rowIndex, pendingCard: game.pendingCard });
+
     // Marquer que la carte a été jouée
     p.playedCard = null;
     
@@ -449,12 +571,20 @@ const Card = (num, sel, click, dis, small) => {
 
 window.handleCard = (c) => {
     const p = state.game.players.find(x => x.id === state.playerId);
+    if (!p) { console.warn('handleCard: player not found'); return; }
     if (p.playedCard) return;
-    if (state.selectedCard === c) playCard(c);
-    else { state.selectedCard = c; render(); }
+    if (state.selectedCard === c) {
+        console.log('Card confirmed, playing', { player: p.name, card: c });
+        playCard(c);
+    }
+    else {
+        state.selectedCard = c;
+        console.log('Card selected', { player: p.name, selectedCard: c });
+        render();
+    }
 };
 
-// FONCTION RENDER - C'EST LA PARTIE QUI MANQUAIT !
+// FONCTION RENDER
 const render = () => {
     const app = document.getElementById('app');
     
@@ -694,6 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const p = new URLSearchParams(window.location.search);
     const j = p.get('join');
     if (j) state.joinCode = j;
+    console.log('App loaded', { joinParam: j });
     render();
 });
 
