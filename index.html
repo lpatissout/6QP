@@ -214,25 +214,28 @@ const startGame = async () => {
 
     try {
         const deck = shuffleDeck();
+        console.log('Deck created, length:', deck.length, 'First cards:', deck.slice(0, 10));
+        
+        // Vérifier que le deck a assez de cartes
+        const cardsNeeded = 4 + (state.game.players.length * 10);
+        if (deck.length < cardsNeeded) {
+            throw new Error(`Pas assez de cartes! Besoin: ${cardsNeeded}, Disponible: ${deck.length}`);
+        }
         
         // Créer les 4 rangées avec la première carte de chaque
         state.game.rows = [
-            [deck.shift()], 
-            [deck.shift()], 
-            [deck.shift()], 
-            [deck.shift()]
+            [deck[0]], 
+            [deck[1]], 
+            [deck[2]], 
+            [deck[3]]
         ];
+        
+        // Retirer les 4 premières cartes du deck
+        deck.splice(0, 4);
         
         // Distribuer 10 cartes à chaque joueur
         state.game.players.forEach(p => {
-            p.hand = [];
-            for (let i = 0; i < 10; i++) {
-                const card = deck.shift();
-                if (card !== undefined) {
-                    p.hand.push(card);
-                }
-            }
-            p.hand.sort((a, b) => a - b);
+            p.hand = deck.splice(0, 10).sort((a, b) => a - b);
             p.playedCard = null;
         });
         
@@ -241,7 +244,7 @@ const startGame = async () => {
         state.game.currentTurn = 1;
         state.game.turnResolved = false;
 
-        console.log('Starting game with rows:', state.game.rows);
+        console.log('Game data before save:', JSON.stringify(state.game.rows));
         await saveGame(state.game);
         state.screen = 'game';
         render();
