@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>6 qui prend ! - Jeu en ligne</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Supprimer l'avertissement Tailwind en production
+        tailwind.config = { corePlugins: { preflight: true } };
+    </script>
     
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -208,20 +212,43 @@ const startGame = async () => {
         return;
     }
 
-    const deck = shuffleDeck();
-    state.game.rows = [[deck.shift()], [deck.shift()], [deck.shift()], [deck.shift()]];
-    state.game.players.forEach(p => {
-        p.hand = deck.splice(0, 10).sort((a, b) => a - b);
-        p.playedCard = null;
-    });
-    state.game.status = 'playing';
-    state.game.round = 1;
-    state.game.currentTurn = 1;
-    state.game.turnResolved = false;
+    try {
+        const deck = shuffleDeck();
+        
+        // Créer les 4 rangées avec la première carte de chaque
+        state.game.rows = [
+            [deck.shift()], 
+            [deck.shift()], 
+            [deck.shift()], 
+            [deck.shift()]
+        ];
+        
+        // Distribuer 10 cartes à chaque joueur
+        state.game.players.forEach(p => {
+            p.hand = [];
+            for (let i = 0; i < 10; i++) {
+                const card = deck.shift();
+                if (card !== undefined) {
+                    p.hand.push(card);
+                }
+            }
+            p.hand.sort((a, b) => a - b);
+            p.playedCard = null;
+        });
+        
+        state.game.status = 'playing';
+        state.game.round = 1;
+        state.game.currentTurn = 1;
+        state.game.turnResolved = false;
 
-    await saveGame(state.game);
-    state.screen = 'game';
-    render();
+        console.log('Starting game with rows:', state.game.rows);
+        await saveGame(state.game);
+        state.screen = 'game';
+        render();
+    } catch (error) {
+        console.error('Error starting game:', error);
+        alert('Erreur au démarrage : ' + error.message);
+    }
 };
 
 const playCard = async (card) => {
@@ -270,8 +297,22 @@ const resolveTurn = async () => {
         if (game.round > game.maxRounds) game.status = 'finished';
         else {
             const deck = shuffleDeck();
-            game.rows = [[deck.shift()], [deck.shift()], [deck.shift()], [deck.shift()]];
-            game.players.forEach(p => { p.hand = deck.splice(0,10).sort((a,b)=>a-b); });
+            game.rows = [
+                [deck.shift()], 
+                [deck.shift()], 
+                [deck.shift()], 
+                [deck.shift()]
+            ];
+            game.players.forEach(p => { 
+                p.hand = [];
+                for (let i = 0; i < 10; i++) {
+                    const card = deck.shift();
+                    if (card !== undefined) {
+                        p.hand.push(card);
+                    }
+                }
+                p.hand.sort((a,b)=>a-b);
+            });
             game.currentTurn = 1;
         }
     }
