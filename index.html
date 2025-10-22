@@ -100,10 +100,14 @@ const subscribeToGame = (code) => {
     gameRef.on('value', async (snap) => {
         const data = snap.val();
         if (!data) return;
+        
+        console.log('Firebase update received:', data.status, 'Current screen:', state.screen);
+        
         state.game = data;
 
-        // CORRECTION : Forcer le passage à l'écran de jeu pour TOUS les joueurs
-        if (data.status === 'playing' && state.screen !== 'game') {
+        // CORRECTION RENFORCÉE : Forcer le passage à l'écran de jeu pour TOUS les joueurs
+        if (data.status === 'playing') {
+            console.log('Game is playing, switching to game screen');
             state.screen = 'game';
         }
 
