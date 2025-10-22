@@ -96,6 +96,10 @@ const shuffleDeck = () => {
 const saveGame = async (data) => {
     if (!database) return;
     
+    // Nettoyer les undefined en les remplaçant par null
+    if (data.pendingCard === undefined) data.pendingCard = null;
+    if (data.waitingForRowChoice === undefined) data.waitingForRowChoice = null;
+    
     // Vérifier qu'il n'y a pas d'undefined dans les rows
     if (data.rows && data.rows.length > 0) {
         for (let i = 0; i < data.rows.length; i++) {
@@ -265,6 +269,8 @@ const startGame = async () => {
         state.game.round = 1;
         state.game.currentTurn = 1;
         state.game.turnResolved = false;
+        state.game.waitingForRowChoice = null;
+        state.game.pendingCard = null;
 
         console.log('Game data before save:', JSON.stringify(state.game.rows));
         await saveGame(state.game);
@@ -314,29 +320,43 @@ const resolveTurn = async () => {
 };
 
 const resolveAllPlays = async (game) => {
-    const plays = game.players.map(p => ({ pid: p.id, card: p.playedCard })).sort((a, b) => a.card - b.card);
+    const plays = game.players
+        .filter(p => p.playedCard !== null) // Filtrer seulement les cartes non encore résolues
+        .map(p => ({ pid: p.id, card: p.playedCard }))
+        .sort((a, b) => a.card - b.card);
+
+    console.log('Resolving plays:', plays);
 
     for (const play of plays) {
         const p = game.players.find(x => x.id === play.pid);
         const validRows = game.rows.map((r, i) => ({ i, last: r[r.length-1], diff: play.card - r[r.length-1] })).filter(x => x.diff > 0);
 
         if (!validRows.length) {
-            // Ce cas ne devrait plus arriver ici car géré avant
-            continue;
+            // Ce joueur doit aussi choisir une rangée
+            console.log('Player', p.name, 'needs to choose a row for card', play.card);
+            game.waitingForRowChoice = play.pid;
+            game.pendingCard = play.card;
+            game.turnResolved = false;
+            await saveGame(game);
+            return; // Arrêter et attendre le choix
         }
         
         const chosenRow = validRows.reduce((min, cur) => cur.diff < min.diff ? cur : min);
         if (game.rows[chosenRow.i].length === 5) {
             const penaltyRow = game.rows[chosenRow.i];
             p.score += penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
+            console.log('Player', p.name, 'took row', chosenRow.i, 'automatically (6th card rule)');
             game.rows[chosenRow.i] = [play.card];
         } else {
             game.rows[chosenRow.i].push(play.card);
+            console.log('Player', p.name, 'placed card on row', chosenRow.i);
         }
         
         p.playedCard = null;
     }
 
+    console.log('All plays resolved, advancing turn');
+    
     game.currentTurn++;
     if (game.currentTurn > 10) {
         game.round++;
