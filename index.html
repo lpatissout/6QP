@@ -272,6 +272,7 @@ const startGame = async () => {
         state.game.waitingForRowChoice = null;
         state.game.pendingCard = null;
 
+        console.log('Game state before save - waitingForRowChoice:', state.game.waitingForRowChoice, 'pendingCard:', state.game.pendingCard);
         console.log('Game data before save:', JSON.stringify(state.game.rows));
         await saveGame(state.game);
         state.screen = 'game';
