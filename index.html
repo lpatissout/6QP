@@ -19,14 +19,14 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        .chat-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-amber-100 to-orange-200 min-h-screen">
     <div id="app"></div>
-    
-    <div id="config-alert" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg hidden z-50">
-        ⚠️ Firebase non configuré ! Suivez les instructions ci-dessous.
-    </div>
 
 <script>
 const firebaseConfig = {
@@ -39,19 +39,14 @@ const firebaseConfig = {
   appId: "1:476103541469:web:3a0ac76f9bde94b1745134"
 };
 
-const isConfigured = firebaseConfig.apiKey !== "VOTRE_API_KEY";
 let database = null;
 
-if (!isConfigured) {
-    document.getElementById('config-alert').classList.remove('hidden');
-} else {
-    try {
-        firebase.initializeApp(firebaseConfig);
-        database = firebase.database();
-        console.log('✅ Firebase OK');
-    } catch (e) {
-        alert('Erreur Firebase: ' + e.message);
-    }
+try {
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+    console.log('✅ Firebase OK');
+} catch (e) {
+    alert('Erreur Firebase: ' + e.message);
 }
 
 let state = {
@@ -107,7 +102,6 @@ const subscribeToGame = (code) => {
         if (!data) return;
         state.game = data;
 
-        // Si tous les joueurs ont joué et le tour n’a pas encore été résolu, résoudre le tour
         if (state.game.status === 'playing' && !state.game.turnResolved) {
             const allPlayed = state.game.players.every(p => p.playedCard !== null);
             if (allPlayed) {
@@ -115,7 +109,6 @@ const subscribeToGame = (code) => {
             }
         }
 
-        // Si la partie a commencé, passer tous les joueurs à l'écran "game"
         if (state.screen === 'lobby' && data.status === 'playing') state.screen = 'game';
         render();
     });
@@ -123,7 +116,7 @@ const subscribeToGame = (code) => {
 
 const createGame = async () => {
     if (!state.playerName.trim() || !database) {
-        alert('Entrez un pseudo et configurez Firebase !');
+        alert('Entrez un pseudo !');
         return;
     }
     
@@ -239,7 +232,7 @@ const resolveTurn = async () => {
     const game = snap.val();
     if (!game) return;
 
-    game.turnResolved = true; // pour éviter double résolution
+    game.turnResolved = true;
     const plays = game.players.map(p => ({ pid: p.id, card: p.playedCard })).sort((a, b) => a.card - b.card);
 
     for (const play of plays) {
@@ -263,7 +256,6 @@ const resolveTurn = async () => {
         p.playedCard = null;
     }
 
-    // Avancer le tour et la manche
     game.currentTurn++;
     if (game.currentTurn > 10) {
         game.round++;
@@ -276,11 +268,9 @@ const resolveTurn = async () => {
         }
     }
 
-    game.turnResolved = false; // pour le tour suivant
+    game.turnResolved = false;
     await saveGame(game);
 };
-
-// --- Le reste du code (chat, copyLink, leaveGame, Card, render) reste identique ---
 
 const sendMessage = async () => {
     if (!state.chatMessage.trim()) return;
@@ -321,14 +311,240 @@ window.handleCard = (c) => {
     else { state.selectedCard = c; render(); }
 };
 
+// FONCTION RENDER - C'EST LA PARTIE QUI MANQUAIT !
+const render = () => {
+    const app = document.getElementById('app');
+    
+    // ÉCRAN D'ACCUEIL
+    if (state.screen === 'home') {
+        app.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8">
+                    <h1 class="text-5xl font-bold text-center mb-2 text-orange-600">🐮 6 qui prend !</h1>
+                    <p class="text-center text-gray-600 mb-8">Jeu de cartes multijoueur en ligne</p>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold mb-2">Votre pseudo</label>
+                        <input type="text" value="${state.playerName}" oninput="state.playerName=this.value" 
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                               placeholder="Entrez votre nom">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <button onclick="createGame()" 
+                                class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+                            🎮 Créer une partie
+                        </button>
+                        <button onclick="state.screen='join'; render()" 
+                                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+                            🔗 Rejoindre une partie
+                        </button>
+                    </div>
+                    
+                    <div class="bg-amber-50 p-4 rounded-lg">
+                        <h3 class="font-bold mb-2">📖 Règles rapides :</h3>
+                        <ul class="text-sm space-y-1 text-gray-700">
+                            <li>• Chaque joueur joue 1 carte par tour</li>
+                            <li>• Les cartes sont placées dans l'ordre croissant</li>
+                            <li>• Si vous êtes le 6ème d'une rangée, vous ramassez les 5 cartes (points négatifs 🐮)</li>
+                            <li>• Le joueur avec le moins de points gagne !</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ÉCRAN REJOINDRE
+    else if (state.screen === 'join') {
+        app.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8">
+                    <h2 class="text-3xl font-bold text-center mb-6 text-blue-600">Rejoindre une partie</h2>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold mb-2">Code de la partie</label>
+                        <input type="text" value="${state.joinCode}" oninput="state.joinCode=this.value.toUpperCase()" 
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none uppercase"
+                               placeholder="Ex: ABC123">
+                    </div>
+                    
+                    <button onclick="joinGame()" 
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg mb-4">
+                        Rejoindre
+                    </button>
+                    
+                    <button onclick="state.screen='home'; render()" 
+                            class="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg transition">
+                        Retour
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ÉCRAN LOBBY
+    else if (state.screen === 'lobby') {
+        const isHost = state.game.hostId === state.playerId;
+        const canStart = isHost && state.game.players.length >= 2 && state.game.players.every(p => p.ready);
+        
+        app.innerHTML = `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-3xl font-bold text-orange-600">Salon d'attente</h2>
+                        <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                            Quitter
+                        </button>
+                    </div>
+                    
+                    <div class="bg-amber-50 p-4 rounded-lg mb-6 flex justify-between items-center">
+                        <div>
+                            <span class="text-sm text-gray-600">Code de la partie :</span>
+                            <span class="text-2xl font-bold ml-2">${state.gameCode}</span>
+                        </div>
+                        <button onclick="copyLink()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            ${state.copied ? '✓ Copié !' : '📋 Copier le lien'}
+                        </button>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="font-bold mb-3">Joueurs (${state.game.players.length}) :</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${state.game.players.map(p => `
+                                <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center">
+                                    <div>
+                                        <span class="font-semibold">${p.name}</span>
+                                        ${p.id === state.game.hostId ? '<span class="text-xs bg-orange-500 text-white px-2 py-1 rounded ml-2">Hôte</span>' : ''}
+                                    </div>
+                                    <span class="text-2xl">${p.ready ? '✅' : '⏳'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-4">
+                        <button onclick="toggleReady()" 
+                                class="flex-1 ${state.game.players.find(x => x.id === state.playerId).ready ? 'bg-gray-400' : 'bg-green-500 hover:bg-green-600'} text-white font-bold py-3 px-6 rounded-lg transition">
+                            ${state.game.players.find(x => x.id === state.playerId).ready ? 'Pas prêt' : 'Je suis prêt !'}
+                        </button>
+                        ${isHost ? `
+                            <button onclick="startGame()" ${!canStart ? 'disabled' : ''}
+                                    class="flex-1 ${canStart ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-300'} text-white font-bold py-3 px-6 rounded-lg transition ${!canStart ? 'cursor-not-allowed' : ''}">
+                                🚀 Lancer la partie
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    ${!canStart && isHost ? '<p class="text-center text-red-500 mt-2 text-sm">Tous les joueurs doivent être prêts (min. 2 joueurs)</p>' : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // ÉCRAN DE JEU
+    else if (state.screen === 'game') {
+        const me = state.game.players.find(x => x.id === state.playerId);
+        const waitingPlayers = state.game.players.filter(p => p.playedCard === null).map(p => p.name);
+        
+        if (state.game.status === 'finished') {
+            const winner = state.game.players.reduce((min, p) => p.score < min.score ? p : min);
+            app.innerHTML = `
+                <div class="container mx-auto px-4 py-8">
+                    <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                        <h1 class="text-5xl font-bold mb-6 text-green-600">🎉 Partie terminée !</h1>
+                        <h2 class="text-3xl mb-8">🏆 ${winner.name} gagne avec ${winner.score} points !</h2>
+                        
+                        <div class="mb-8">
+                            <h3 class="font-bold mb-4">Classement final :</h3>
+                            ${state.game.players.sort((a, b) => a.score - b.score).map((p, i) => `
+                                <div class="bg-gray-100 p-4 rounded-lg mb-2 flex justify-between items-center">
+                                    <span class="text-2xl">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : ''}  ${p.name}</span>
+                                    <span class="font-bold text-xl">${p.score} 🐮</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                        <button onclick="leaveGame()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-lg">
+                            Retour à l'accueil
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        app.innerHTML = `
+            <div class="container mx-auto px-4 py-4">
+                <div class="max-w-6xl mx-auto">
+                    <!-- Header -->
+                    <div class="bg-white rounded-lg shadow-lg p-4 mb-4 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-orange-600">Manche ${state.game.round}/${state.game.maxRounds} - Tour ${state.game.currentTurn}/10</h2>
+                            <p class="text-sm text-gray-600">Code: ${state.gameCode}</p>
+                        </div>
+                        <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                            Quitter
+                        </button>
+                    </div>
+                    
+                    <!-- Scores -->
+                    <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-${state.game.players.length} gap-2">
+                            ${state.game.players.map(p => `
+                                <div class="text-center p-2 rounded ${p.id === state.playerId ? 'bg-orange-100' : 'bg-gray-100'}">
+                                    <div class="font-semibold">${p.name}</div>
+                                    <div class="text-2xl font-bold">${p.score} 🐮</div>
+                                    ${p.playedCard ? '<div class="text-green-500 text-sm">✓ Joué</div>' : '<div class="text-gray-400 text-sm">En attente...</div>'}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- Rangées -->
+                    <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
+                        <h3 class="font-bold mb-4 text-lg">Rangées de cartes :</h3>
+                        <div class="space-y-3">
+                            ${state.game.rows.map((row, i) => `
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-600">R${i + 1}:</span>
+                                    <div class="flex gap-1 flex-wrap">
+                                        ${row.map(c => Card(c, false, false, true, true)).join('')}
+                                    </div>
+                                    <span class="text-sm text-gray-500">(${row.length}/5)</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- Main du joueur -->
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="font-bold mb-4 text-lg">Votre main :</h3>
+                        ${me.playedCard ? `
+                            <div class="text-center py-8">
+                                <p class="text-xl mb-4">✓ Vous avez joué votre carte !</p>
+                                <p class="text-gray-600">En attente des autres joueurs...</p>
+                                ${waitingPlayers.length > 0 ? `<p class="text-sm text-gray-500 mt-2">Attente de : ${waitingPlayers.join(', ')}</p>` : ''}
+                            </div>
+                        ` : `
+                            <div class="flex gap-2 flex-wrap justify-center">
+                                ${me.hand.map(c => Card(c, state.selectedCard === c, true, false, false)).join('')}
+                            </div>
+                            ${state.selectedCard ? '<p class="text-center mt-4 text-sm text-gray-600">Cliquez à nouveau pour confirmer</p>' : '<p class="text-center mt-4 text-sm text-gray-600">Choisissez une carte</p>'}
+                        `}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const p = new URLSearchParams(window.location.search);
     const j = p.get('join');
     if (j) state.joinCode = j;
     render();
 });
-
-// --- Note: le reste du render() reste identique à ton code précédent ---
 
 </script>
 </body>
