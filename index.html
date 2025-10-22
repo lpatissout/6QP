@@ -102,6 +102,11 @@ const subscribeToGame = (code) => {
         if (!data) return;
         state.game = data;
 
+        // CORRECTION : Forcer le passage à l'écran de jeu pour TOUS les joueurs
+        if (data.status === 'playing' && state.screen !== 'game') {
+            state.screen = 'game';
+        }
+
         if (state.game.status === 'playing' && !state.game.turnResolved) {
             const allPlayed = state.game.players.every(p => p.playedCard !== null);
             if (allPlayed) {
@@ -109,7 +114,6 @@ const subscribeToGame = (code) => {
             }
         }
 
-        if (state.screen === 'lobby' && data.status === 'playing') state.screen = 'game';
         render();
     });
 };
