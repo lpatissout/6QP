@@ -646,7 +646,7 @@ const render = () => {
                     <!-- Rangées -->
                     <div class="bg-white rounded-lg shadow-lg p-6 mb-4">
                         <h3 class="font-bold mb-4 text-lg">Rangées de cartes :</h3>
-                        ${state.game.waitingForRowChoice === state.playerId ? 
+                        ${state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId ? 
                             '<div class="bg-orange-100 border-2 border-orange-500 rounded-lg p-4 mb-4"><p class="text-center font-bold text-orange-700">⚠️ Votre carte est trop petite ! Choisissez une rangée à ramasser en cliquant dessus :</p></div>' 
                             : state.game.waitingForRowChoice ? 
                             '<div class="bg-blue-100 border-2 border-blue-500 rounded-lg p-4 mb-4"><p class="text-center font-bold text-blue-700">⏳ ' + state.game.players.find(p => p.id === state.game.waitingForRowChoice).name + ' doit choisir une rangée...</p></div>'
@@ -654,7 +654,7 @@ const render = () => {
                         <div class="space-y-3">
                             ${state.game.rows.map((row, i) => {
                                 const totalHeads = row.reduce((sum, c) => sum + calculateHeads(c), 0);
-                                const canClick = state.game.waitingForRowChoice === state.playerId;
+                                const canClick = state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId;
                                 return `
                                 <div class="flex items-center gap-2 ${canClick ? 'cursor-pointer hover:bg-orange-50 border-2 border-transparent hover:border-orange-500 rounded-lg p-2 transition' : ''}" ${canClick ? 'onclick="chooseRow(' + i + ')"' : ''}>
                                     <span class="font-bold text-gray-600 min-w-[40px]">R${i + 1}:</span>
