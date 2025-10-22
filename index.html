@@ -93,6 +93,21 @@ const shuffleDeck = () => {
 
 const saveGame = async (data) => {
     if (!database) return;
+    
+    // Vérifier qu'il n'y a pas d'undefined dans les rows
+    if (data.rows && data.rows.length > 0) {
+        for (let i = 0; i < data.rows.length; i++) {
+            for (let j = 0; j < data.rows[i].length; j++) {
+                if (data.rows[i][j] === undefined) {
+                    console.error(`ERREUR: Carte undefined détectée à rows[${i}][${j}]`);
+                    console.error('Données complètes:', JSON.stringify(data.rows));
+                    throw new Error(`Carte undefined à la position [${i}][${j}]`);
+                }
+            }
+        }
+    }
+    
+    console.log('Saving to Firebase:', JSON.stringify(data.rows));
     await database.ref('games/' + state.gameCode).set(data);
     state.game = data;
 };
@@ -107,6 +122,8 @@ const subscribeToGame = (code) => {
         
         console.log('Firebase update received:', data.status, 'Current screen:', state.screen);
         
+        // NE PAS ÉCRASER state.game avant de vérifier
+        const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
         // CORRECTION RENFORCÉE : Forcer le passage à l'écran de jeu pour TOUS les joueurs
@@ -115,7 +132,8 @@ const subscribeToGame = (code) => {
             state.screen = 'game';
         }
 
-        if (state.game.status === 'playing' && !state.game.turnResolved) {
+        // Résoudre le tour SEULEMENT si ce n'est pas nous qui venons de démarrer
+        if (state.game.status === 'playing' && !state.game.turnResolved && oldStatus === 'playing') {
             const allPlayed = state.game.players.every(p => p.playedCard !== null);
             if (allPlayed) {
                 await resolveTurn();
@@ -301,20 +319,14 @@ const resolveTurn = async () => {
         else {
             const deck = shuffleDeck();
             game.rows = [
-                [deck.shift()], 
-                [deck.shift()], 
-                [deck.shift()], 
-                [deck.shift()]
+                [deck[0]], 
+                [deck[1]], 
+                [deck[2]], 
+                [deck[3]]
             ];
+            deck.splice(0, 4);
             game.players.forEach(p => { 
-                p.hand = [];
-                for (let i = 0; i < 10; i++) {
-                    const card = deck.shift();
-                    if (card !== undefined) {
-                        p.hand.push(card);
-                    }
-                }
-                p.hand.sort((a,b)=>a-b);
+                p.hand = deck.splice(0, 10).sort((a,b)=>a-b);
             });
             game.currentTurn = 1;
         }
