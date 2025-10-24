@@ -13,7 +13,8 @@ let database = null;
 try {
     firebase.initializeApp(firebaseConfig);
     database = firebase.database();
-    console.log('✅ Firebase OK');
+    console.log('✅ Firebase initialized successfully');
 } catch (e) {
+    console.error('❌ Firebase initialization error:', e);
     alert('Erreur Firebase: ' + e.message);
 }
