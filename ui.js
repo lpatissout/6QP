@@ -1,59 +1,80 @@
-function render() {
-    const app = document.getElementById('app');
+// UI - Carte
+const Card = (num, selected=false, clickable=true, small=false) => {
+    const h = calculateHeads(num);
+    const col = getCardColor(num);
+    const sz = small ? 'w-12 h-16 text-xs' : 'w-16 h-24 text-sm';
+    const sel = selected ? 'ring-4 ring-blue-600 scale-105' : '';
+    const cursor = clickable ? 'hover:scale-105 cursor-pointer' : 'opacity-50';
+    return `<button ${clickable ? `onclick="handleCard(${num})"` : ''} 
+        class="${sz} ${col} text-white rounded-lg shadow-md flex flex-col items-center justify-between p-1 transition ${sel} ${cursor} font-bold">
+        <span class="text-xl">${num}</span>
+        <div>${'🐮'.repeat(h)}</div>
+    </button>`;
+};
 
-    // HOME
+// UI - Render
+const render = () => {
+    const app = document.getElementById('app');
+    const me = state.game?.players?.find(x => x.id === state.playerId);
+
     if (state.screen === 'home') {
         app.innerHTML = `
-        <div class="container mx-auto px-4 py-8">
-            <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8">
-                <h1 class="text-5xl font-bold text-center mb-2 text-orange-600">🐮 6 qui prend !</h1>
-                <input type="text" placeholder="Votre pseudo" value="${state.playerName}" oninput="state.playerName=this.value"
-                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-4">
-                <button onclick="createGame()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-lg mb-2">Créer une partie</button>
-                <button onclick="state.screen='join'; render()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg">Rejoindre</button>
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <h1 class="text-5xl font-bold text-orange-600 mb-4">🐮 6 qui prend !</h1>
+                    <input type="text" placeholder="Pseudo" value="${state.playerName}" 
+                        oninput="state.playerName=this.value" class="mb-4 w-full px-4 py-3 border rounded"/>
+                    <div class="flex gap-2 justify-center">
+                        <button onclick="createGame()" class="bg-orange-500 text-white px-4 py-2 rounded">Créer</button>
+                        <button onclick="state.screen='join'; render()" class="bg-blue-500 text-white px-4 py-2 rounded">Rejoindre</button>
+                    </div>
+                </div>
             </div>
-        </div>`;
+        `;
         return;
     }
 
-    // JOIN
     if (state.screen === 'join') {
         app.innerHTML = `
-        <div class="container mx-auto px-4 py-8">
-            <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8">
-                <input type="text" placeholder="Code de la partie" value="${state.joinCode}" oninput="state.joinCode=this.value.toUpperCase()"
-                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-4">
-                <button onclick="joinGame()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg mb-2">Rejoindre</button>
-                <button onclick="state.screen='home'; render()" class="w-full bg-gray-300 py-3 rounded-lg">Retour</button>
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <input type="text" placeholder="Code" value="${state.joinCode}" oninput="state.joinCode=this.value" class="mb-4 w-full px-4 py-3 border rounded"/>
+                    <button onclick="joinGame()" class="bg-blue-500 text-white px-4 py-2 rounded mb-2">Rejoindre</button>
+                    <button onclick="state.screen='home'; render()" class="bg-gray-300 px-4 py-2 rounded">Retour</button>
+                </div>
             </div>
-        </div>`;
+        `;
         return;
     }
 
-    // LOBBY
-    if (state.screen === 'lobby') {
-        const isHost = state.game.hostId === state.playerId;
-        const canStart = isHost && state.game.players.length >= 2 && state.game.players.every(p=>p.ready);
-        app.innerHTML = `
-        <div class="container mx-auto px-4 py-8">
-            <h2 class="text-3xl font-bold text-orange-600 mb-4">Salon d'attente</h2>
-            <div class="mb-4">Code : ${state.gameCode}</div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                ${state.game.players.map(p=>`<div class="bg-gray-100 p-2 rounded">${p.name} ${p.id===state.game.hostId?'(Hôte)':''} ${p.ready?'✅':'⏳'}</div>`).join('')}
-            </div>
-            <div class="flex gap-2">
-                <button onclick="toggleReady()" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded">${state.game.players.find(x=>x.id===state.playerId).ready?'Pas prêt':'Je suis prêt !'}</button>
-                ${isHost?`<button onclick="startGame()" ${!canStart?'disabled':''} class="flex-1 bg-orange-500 text-white py-2 rounded ${!canStart?'opacity-50 cursor-not-allowed':''}">Lancer la partie</button>`:''}
-            </div>
-        </div>`;
-        return;
-    }
-
-    // GAME
     if (state.screen === 'game') {
-        app.innerHTML = `<h2 class="text-2xl font-bold text-center mb-4 text-orange-600">Jeu en cours</h2>
-        <div class="flex flex-wrap justify-center gap-2 mb-4">
-            ${state.game.deck.map(c=>`<div class="card bg-white border p-4 rounded shadow" onclick="playCard(${c})">${c}</div>`).join('')}
-        </div>`;
+        const debugHTML = !state.isMobile && state.showDebug ? `
+            <div class="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs mb-4 max-h-64 overflow-y-auto">
+                <h3 class="font-bold mb-2">Debug console</h3>
+                ${state.debugLogs.map(l=>`[${l.time}] ${l.msg} ${l.data?JSON.stringify(l.data):''}`).join('<br/>')}
+            </div>
+        ` : '';
+
+        const handHTML = me && me.hand ? me.hand.map(c => 
+            Card(c, state.selectedCard===c, canPlayCard())
+        ).join('') : '';
+
+        app.innerHTML = `
+            <div class="container mx-auto p-4">
+                <div class="flex justify-between mb-4">
+                    <h2 class="text-xl font-bold text-orange-600">Round ${state.game.round}/Max</h2>
+                    ${!state.isMobile ? `<button onclick="state.showDebug=!state.showDebug; render()" class="bg-purple-500 text-white px-2 py-1 rounded">Debug</button>` : ''}
+                </div>
+                ${debugHTML}
+                <div class="mb-4"><h3 class="font-bold mb-2">Votre main :</h3><div class="flex gap-2 flex-wrap">${handHTML}</div></div>
+            </div>
+        `;
     }
-}
+};
+
+// Carte cliquée
+window.handleCard = (c) => {
+    if (!canPlayCard()) return;
+    if (state.selectedCard === c) playCard(c);
+    else { state.selectedCard = c; render(); }
+};

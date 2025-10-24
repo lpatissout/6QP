@@ -1,36 +1,39 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const params = new URLSearchParams(window.location.search);
-    const join = params.get('join');
-    if (join) state.joinCode = join.toUpperCase();
-
-    // Détecter mobile pour UI adaptative et console debug masquée
-    state.isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
-    // Masquer console debug sur mobile
-    if (state.isMobile) console.log = function() {};
-
+    const p = new URLSearchParams(window.location.search).get('join');
+    if (p) state.joinCode = p;
     render();
 });
 
-// Toggle ready
-function toggleReady() {
-    const player = state.game.players.find(p=>p.id===state.playerId);
-    player.ready = !player.ready;
-    saveGame(state.gameCode, state.game);
+// Création / Join / Leave
+const createGame = async () => {
+    if (!state.playerName.trim()) return alert('Pseudo requis');
+    const pid = Math.random().toString(36).substring(7);
+    state.playerId = pid;
+    state.gameCode = Math.random().toString(36).substring(2,8).toUpperCase();
+    state.game = {
+        code: state.gameCode,
+        status: 'waiting',
+        hostId: pid,
+        players:[{id:pid,name:state.playerName,score:0,hand:[],playedCard:null}],
+        round: 1,
+        maxRounds:6,
+        waitingForRowChoice:null
+    };
+    await saveGame(state.game);
+    state.screen='game';
     render();
-}
+};
 
-// Quitter
-function leaveGame() {
-    state.screen = 'home';
-    state.game = null;
-    state.gameCode = '';
+const joinGame = async () => {
+    if (!state.playerName.trim() || !state.joinCode.trim()) return alert('Pseudo + code requis');
+    const game = await getGame(state.joinCode.toUpperCase());
+    if (!game) return alert('Partie introuvable');
+    const pid = Math.random().toString(36).substring(7);
+    state.playerId=pid;
+    state.gameCode=game.code;
+    game.players.push({id:pid,name:state.playerName,score:0,hand:[],playedCard:null});
+    state.game = game;
+    await saveGame(game);
+    state.screen='game';
     render();
-}
-
-// Copier lien
-function copyLink() {
-    navigator.clipboard.writeText(window.location.href);
-    state.copied = true;
-    render();
-}
+};

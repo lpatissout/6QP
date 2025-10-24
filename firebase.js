@@ -1,22 +1,33 @@
+// Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyC2YfNviAE_jDD0wT7TmfZBeOaKqjJdJuQ",
-    authDomain: "879a6.firebaseapp.com",
-    databaseURL: "https://quiprend-879a6-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "quiprend-879a6",
-    storageBucket: "quiprend-879a6.firebasestorage.app",
-    messagingSenderId: "476103541469",
-    appId: "1:476103541469:web:3a0ac76f9bde94b1745134"
+  apiKey: "AIzaSyC2YfNviAE_jDD0wT7TmfZBeOaKqjJdJuQ",
+  authDomain: "quiprend-879a6.firebaseapp.com",
+  databaseURL: "https://quiprend-879a6-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "quiprend-879a6",
+  storageBucket: "quiprend-879a6.firebasestorage.app",
+  messagingSenderId: "476103541469",
+  appId: "1:476103541469:web:3a0ac76f9bde94b1745134"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+let database = null;
 
-function saveGame(gameCode, data) {
-    return db.ref(`games/${gameCode}`).set(data).catch(err => console.error("Firebase save error", err));
+try {
+    firebase.initializeApp(firebaseConfig);
+    database = firebase.database();
+    console.log('✅ Firebase OK');
+} catch (e) {
+    alert('Erreur Firebase: ' + e.message);
 }
 
-function getGame(gameCode, callback) {
-    db.ref(`games/${gameCode}`).on('value', snapshot => {
-        callback(snapshot.val());
-    });
-}
+// Sauvegarde d’une partie
+const saveGame = async (game) => {
+    if (!database) return;
+    await database.ref('games/' + game.code).set(game);
+};
+
+// Récupération d’une partie
+const getGame = async (code) => {
+    if (!database) return null;
+    const snap = await database.ref('games/' + code).once('value');
+    return snap.val();
+};
