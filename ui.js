@@ -1,80 +1,81 @@
-// UI - Carte
-const Card = (num, selected=false, clickable=true, small=false) => {
-    const h = calculateHeads(num);
-    const col = getCardColor(num);
-    const sz = small ? 'w-12 h-16 text-xs' : 'w-16 h-24 text-sm';
-    const sel = selected ? 'ring-4 ring-blue-600 scale-105' : '';
-    const cursor = clickable ? 'hover:scale-105 cursor-pointer' : 'opacity-50';
-    return `<button ${clickable ? `onclick="handleCard(${num})"` : ''} 
-        class="${sz} ${col} text-white rounded-lg shadow-md flex flex-col items-center justify-between p-1 transition ${sel} ${cursor} font-bold">
-        <span class="text-xl">${num}</span>
-        <div>${'🐮'.repeat(h)}</div>
-    </button>`;
+const app = document.getElementById('app');
+
+const renderDebug = () => {
+    if(state.isMobile) return ''; // pas de console sur mobile
+    if(!state.showDebug) return '';
+    return `
+    <div class="absolute top-2 right-2 w-80 max-h-96 overflow-y-auto bg-black text-white text-xs p-2 rounded">
+        ${state.debugLogs.map(d=>`[${d.time}] ${d.msg} ${d.data?d.data:''}`).join('<br>')}
+    </div>`;
 };
 
-// UI - Render
+const renderHome = () => `
+<div class="flex flex-col items-center justify-center min-h-screen gap-4">
+    <h1 class="text-3xl font-bold text-orange-700">6 qui prend !</h1>
+    <input placeholder="Pseudo" value="${state.playerName}" class="px-2 py-1 border rounded" id="inputName">
+    <button onclick="startCreate()" class="bg-green-400 px-4 py-2 rounded">Créer une partie</button>
+    <input placeholder="Code Partie" value="${state.joinCode}" class="px-2 py-1 border rounded" id="inputCode">
+    <button onclick="startJoin()" class="bg-blue-400 px-4 py-2 rounded">Rejoindre une partie</button>
+    ${renderDebug()}
+</div>`;
+
+const renderLobby = () => {
+    const playersHTML = state.game.players.map(p=>`
+        <div class="flex justify-between w-full p-1">
+            <span>${p.name}</span>
+            <span>${p.ready?'✅':'❌'}</span>
+        </div>
+    `).join('');
+    return `
+<div class="flex flex-col items-center min-h-screen p-4 gap-4">
+    <h2 class="text-xl font-bold">Lobby ${state.gameCode}</h2>
+    <div class="w-64 border p-2">${playersHTML}</div>
+    <button onclick="toggleReady()" class="bg-yellow-400 px-4 py-2 rounded">
+        ${state.game.players.find(p=>p.id===state.playerId).ready?'Annuler':'Prêt'}
+    </button>
+    ${state.game.hostId===state.playerId?`<button onclick="startGame()" class="bg-green-500 px-4 py-2 rounded mt-2">Démarrer la partie</button>`:''}
+    ${renderDebug()}
+</div>`;
+};
+
+const renderGame = () => {
+    const p = state.game.players.find(p=>p.id===state.playerId);
+    const handHTML = p.hand.map(c=>`
+        <div onclick="playCardUI(${c})" class="cursor-pointer ${getCardColor(c)} text-white font-bold p-2 m-1 rounded">
+            ${c}
+        </div>
+    `).join('');
+    const rowsHTML = state.game.rows.map((row,i)=>`
+        <div class="flex gap-1 p-1 border-b" id="row-${i}">
+            ${row.map(c=>`<div class="w-8 h-12 ${getCardColor(c)} rounded text-white text-center">${c}</div>`).join('')}
+        </div>
+    `).join('');
+
+    return `
+<div class="flex flex-col min-h-screen p-2">
+    <div class="flex justify-between mb-2">
+        <div>Joueur: ${p.name} - Score: ${p.score}</div>
+        <button onclick="toggleDebug()" class="bg-gray-300 px-2 rounded">Debug</button>
+    </div>
+    <div class="flex flex-col gap-2">${rowsHTML}</div>
+    <h3 class="mt-2 font-bold">Votre main</h3>
+    <div class="flex flex-wrap gap-2">${handHTML}</div>
+    ${renderDebug()}
+</div>`;
+};
+
+const toggleDebug = () => state.showDebug = !state.showDebug;
+
+const playCardUI = (card) => {
+    if(!canPlayCard()) return;
+    state.selectedCard = card;
+    playCard(card);
+};
+
 const render = () => {
-    const app = document.getElementById('app');
-    const me = state.game?.players?.find(x => x.id === state.playerId);
-
-    if (state.screen === 'home') {
-        app.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
-                    <h1 class="text-5xl font-bold text-orange-600 mb-4">🐮 6 qui prend !</h1>
-                    <input type="text" placeholder="Pseudo" value="${state.playerName}" 
-                        oninput="state.playerName=this.value" class="mb-4 w-full px-4 py-3 border rounded"/>
-                    <div class="flex gap-2 justify-center">
-                        <button onclick="createGame()" class="bg-orange-500 text-white px-4 py-2 rounded">Créer</button>
-                        <button onclick="state.screen='join'; render()" class="bg-blue-500 text-white px-4 py-2 rounded">Rejoindre</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        return;
+    switch(state.screen){
+        case 'home': app.innerHTML=renderHome(); break;
+        case 'lobby': app.innerHTML=renderLobby(); break;
+        case 'game': app.innerHTML=renderGame(); break;
     }
-
-    if (state.screen === 'join') {
-        app.innerHTML = `
-            <div class="container mx-auto px-4 py-8">
-                <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
-                    <input type="text" placeholder="Code" value="${state.joinCode}" oninput="state.joinCode=this.value" class="mb-4 w-full px-4 py-3 border rounded"/>
-                    <button onclick="joinGame()" class="bg-blue-500 text-white px-4 py-2 rounded mb-2">Rejoindre</button>
-                    <button onclick="state.screen='home'; render()" class="bg-gray-300 px-4 py-2 rounded">Retour</button>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
-    if (state.screen === 'game') {
-        const debugHTML = !state.isMobile && state.showDebug ? `
-            <div class="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs mb-4 max-h-64 overflow-y-auto">
-                <h3 class="font-bold mb-2">Debug console</h3>
-                ${state.debugLogs.map(l=>`[${l.time}] ${l.msg} ${l.data?JSON.stringify(l.data):''}`).join('<br/>')}
-            </div>
-        ` : '';
-
-        const handHTML = me && me.hand ? me.hand.map(c => 
-            Card(c, state.selectedCard===c, canPlayCard())
-        ).join('') : '';
-
-        app.innerHTML = `
-            <div class="container mx-auto p-4">
-                <div class="flex justify-between mb-4">
-                    <h2 class="text-xl font-bold text-orange-600">Round ${state.game.round}/Max</h2>
-                    ${!state.isMobile ? `<button onclick="state.showDebug=!state.showDebug; render()" class="bg-purple-500 text-white px-2 py-1 rounded">Debug</button>` : ''}
-                </div>
-                ${debugHTML}
-                <div class="mb-4"><h3 class="font-bold mb-2">Votre main :</h3><div class="flex gap-2 flex-wrap">${handHTML}</div></div>
-            </div>
-        `;
-    }
-};
-
-// Carte cliquée
-window.handleCard = (c) => {
-    if (!canPlayCard()) return;
-    if (state.selectedCard === c) playCard(c);
-    else { state.selectedCard = c; render(); }
 };
