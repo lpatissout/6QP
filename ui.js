@@ -105,6 +105,20 @@ const renderJoin = () => `
         <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8">
             <h2 class="text-2xl font-bold text-center mb-6">Rejoindre une partie</h2>
             
+            <!-- Champ pseudo -->
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2">Votre pseudo</label>
+                <input 
+                    type="text" 
+                    id="inputName"
+                    value="${escapeHtml(state.playerName || '')}" 
+                    oninput="state.playerName = this.value" 
+                    class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                    placeholder="Entrez votre nom"
+                >
+            </div>
+
+            <!-- Code de la partie -->
             <div class="mb-4">
                 <label class="block text-sm font-semibold mb-2">Code de la partie</label>
                 <input 
@@ -115,14 +129,15 @@ const renderJoin = () => `
                     class="w-full px-4 py-2 border rounded-lg uppercase focus:outline-none focus:ring-2 focus:ring-blue-500" 
                     placeholder="Ex: ABC123"
                     maxlength="6"
+                    ${state.invitePending ? 'readonly' : ''}
                 >
             </div>
             
             <button 
-                onclick="joinGame()" 
+                onclick="if(state.playerName.trim()){ joinGame(); } else { alert('Merci d’entrer un pseudo avant de rejoindre.'); }"
                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-3 transition"
             >
-                Rejoindre
+                🎮 Rejoindre la partie
             </button>
             
             <button 

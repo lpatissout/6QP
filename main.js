@@ -55,24 +55,25 @@ window.chooseRow = chooseRow;
 window.leaveGame = leaveGame;
 window.copyLink = copyLink;
 
-// CORRECTION : Initialisation au chargement du DOM
+// ==================== INITIALISATION ==================== //
+
 document.addEventListener('DOMContentLoaded', () => {
     debugLog('App initialized', { isMobile: state.isMobile });
 
-    // Check for join code in URL
+    // Détection d’un lien d’invitation
     const urlParams = new URLSearchParams(window.location.search);
     const joinCode = urlParams.get('join');
     
     if (joinCode) {
         state.joinCode = joinCode.toUpperCase();
-        state.screen = 'join';
-        debugLog('Join code detected in URL', { joinCode: state.joinCode });
+        state.invitePending = true; // ✅ on note qu’on vient d’une invitation
+        debugLog('Invitation detected from URL', { joinCode: state.joinCode });
     }
 
-    // Initial render
+    // Rendu initial
     render();
 
-    // Handle window resize for mobile detection
+    // Détection du redimensionnement pour gérer mobile/desktop
     window.addEventListener('resize', () => {
         const wasMobile = state.isMobile;
         state.isMobile = window.innerWidth < 768;
@@ -80,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wasMobile !== state.isMobile) {
             debugLog('Mobile state changed', { isMobile: state.isMobile });
             if (state.isMobile) {
-                state.showDebug = false;
+                state.showDebug = false; // ✅ cacher le debug sur mobile
             }
             render();
         }
