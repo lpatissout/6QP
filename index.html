@@ -1,54 +1,57 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>6 qui prend !</title>
-
-    <!-- External dependencies: Tailwind CSS for styling -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6 qui prend ! - Jeu en ligne</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { corePlugins: { preflight: true } };
     </script>
-
-    <!-- External dependencies: Firebase for real-time database -->
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
-    <!-- Custom styles: Links to the local CSS file for game-specific styling -->
-    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans:wght@400;600&display=swap');
+        body { 
+            font-family: "Open Sans", sans-serif; 
+            margin: 0; 
+            background: linear-gradient(135deg, #fffbeb, #ffedd5); 
+            min-height: 100vh; 
+        }
+        .card-hover:hover {
+            transform: scale(1.05);
+            transition: transform 0.2s;
+        }
+        .debug-panel {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-top-left-radius: 8px;
+            z-index: 1000;
+        }
+        @media (max-width: 768px) {
+            .debug-panel {
+                display: none;
+            }
+        }
+    </style>
 </head>
-<body>
-    <!-- Main page content wrapper (reserves space for spectator panel) -->
-    <div id="page-wrap">
-        <div id="app"></div>
-    </div>
+<body class="bg-gradient-to-br from-amber-100 to-orange-200 min-h-screen">
+    <div id="app"></div>
 
-    <!-- Spectator panel for logs and debugging -->
-    <div id="spectator-panel" role="region" aria-label="Console spectateur">
-        <div id="spectator-header">
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <strong style="color: #fff;">6 qui prend — Spectateur</strong>
-                <span style="font-size: 12px; color: #9fb0c8;">(logs globaux)</span>
-            </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
-                <button id="filter-all" class="spec-btn active">All</button>
-                <button id="filter-log" class="spec-btn">Log</button>
-                <button id="filter-info" class="spec-btn">Info</button>
-                <button id="filter-warn" class="spec-btn">Warn</button>
-                <button id="filter-error" class="spec-btn">Error</button>
-                <button id="clear-logs" class="spec-btn" title="Clear logs">Clear</button>
-                <button id="download-logs" class="spec-btn" title="Télécharger les logs">Download</button>
-                <button id="collapse-spec" class="spec-btn" title="Masquer console">Collapse</button>
-            </div>
-        </div>
-        <div id="spectator-console" aria-live="polite" tabindex="0"></div>
-    </div>
-    <button id="spectator-collapsed" title="Afficher console">Logs ▶</button>
-
-    <!-- Scripts: Load spectator first (for logging), then game logic -->
-    <!-- This ensures spectator.js initializes the console before game.js uses it -->
-    <script src="js/spectator.js"></script>
-    <script src="js/game.js"></script>
+    <!-- ORDRE CRITIQUE : Firebase -> game -> ui -> main -->
+    <script src="firebase.js"></script>
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
