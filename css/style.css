@@ -1,0 +1,136 @@
+/* Import Google Fonts for typography */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans:wght@400;600&display=swap');
+
+/* CSS Variables for consistent theming */
+:root {
+    --bg: #fff7ed;
+    --accent: #f97316;
+}
+
+/* Global body styles */
+body {
+    font-family: "Open Sans", sans-serif;
+    margin: 0;
+    background: linear-gradient(135deg, #fffbeb, #ffedd5);
+    min-height: 100vh;
+}
+
+/* Layout: Main page wrapper (reserves space for spectator panel) */
+#page-wrap {
+    margin-right: 28%;
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 1rem;
+}
+
+/* Spectator panel: Fixed position on the right */
+#spectator-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 28%;
+    height: 100vh;
+    background: #0b0b0b;
+    color: #b7f0a7;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Spectator header: Flex layout for title and buttons */
+#spectator-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Spectator console: Scrollable log area */
+#spectator-console {
+    padding: 10px;
+    overflow-y: auto;
+    font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+/* Log line styles: Individual log entries */
+.log-line {
+    margin-bottom: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.log-TIME {
+    color: #8f9bb3;
+    font-size: 11px;
+    margin-right: 6px;
+}
+.log-LOG {
+    color: #cfe7ff;
+}
+.log-INFO {
+    color: #b7f0a7;
+}
+.log-WARN {
+    color: #ffd580;
+}
+.log-ERROR {
+    color: #ff7a7a;
+}
+
+/* Spectator buttons: Base styles */
+.spec-btn {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 6px 8px;
+    border-radius: 6px;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+}
+.spec-btn.active {
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Collapsed spectator button: Hidden by default, shown when panel is collapsed */
+#spectator-collapsed {
+    display: none;
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #111;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px 0 0 6px;
+    cursor: pointer;
+    z-index: 90;
+}
+
+/* Debug button style: Used inside the app for toggling debug panel */
+.debug-btn {
+    background: #7c3aed;
+    color: white;
+}
+
+/* Responsive design: Adjust layout on smaller screens */
+@media (max-width: 1024px) {
+    #page-wrap {
+        margin-right: 0;
+    }
+    #spectator-panel {
+        width: 100%;
+        height: 32vh;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+    }
+    #spectator-collapsed {
+        display: none;
+    }
+}
