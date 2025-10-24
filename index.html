@@ -1,29 +1,34 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>6 qui prend ! - Jeu en ligne</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { corePlugins: { preflight: true } };
-    </script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans:wght@400;600&display=swap');
-        body { font-family: 'Open Sans', sans-serif; }
-        h1, h2, h3, h4 { font-family: 'Montserrat', sans-serif; }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .chat-container { max-height: 300px; overflow-y: auto; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>6 qui prend ! - Jeu en ligne</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { corePlugins: { preflight: true } };
+</script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+<style>
+body { font-family: 'Open Sans', sans-serif; }
+h1,h2,h3,h4 { font-family: 'Montserrat', sans-serif; }
+.pulse { animation: pulse 2s infinite; }
+.chat-container { max-height: 300px; overflow-y:auto; }
+.card { cursor:pointer; transition: transform 0.2s; }
+.card:hover { transform: scale(1.05); }
+</style>
 </head>
 <body class="bg-gradient-to-br from-amber-100 to-orange-200 min-h-screen">
-    <div id="app"></div>
-    <script src="./firebase.js"></script>
-    <script src="./game.js"></script>
-    <script src="./ui.js"></script>
-    <script src="./main.js"></script>
+<div id="app"></div>
+
+<!-- Scripts -->
+<script src="firebase.js"></script>
+<script src="game.js"></script>
+<script src="ui.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
