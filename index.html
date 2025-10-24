@@ -15,7 +15,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
-    <!-- Custom styles -->
+    <!-- Custom styles: Links to the local CSS file for game-specific styling -->
     <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -46,7 +46,8 @@
     </div>
     <button id="spectator-collapsed" title="Afficher console">Logs ▶</button>
 
-    <!-- Scripts: Load spectator first, then game logic -->
+    <!-- Scripts: Load spectator first (for logging), then game logic -->
+    <!-- This ensures spectator.js initializes the console before game.js uses it -->
     <script src="js/spectator.js"></script>
     <script src="js/game.js"></script>
 </body>
