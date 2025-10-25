@@ -1,25 +1,8 @@
-/* ==================== UI RENDERING (ui.js) ==================== */
-
-/* ==================== Helpers / safety ==================== */
-
-// Keep invitePending defined if not present
-if (typeof state.invitePending === 'undefined') state.invitePending = false;
-
-// Escape HTML to avoid XSS
-const escapeHtml = (str) => {
-    if (str === null || typeof str === 'undefined') return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-};
+/* ==================== UI RENDERING ==================== */
 
 /* ==================== Debug panel ==================== */
 
 const renderDebugPanel = () => {
-    // Always hide debug on mobile
     if (state.isMobile || !state.showDebug) return '';
 
     return `
@@ -50,9 +33,9 @@ const renderCard = (num, selected = false, clickable = true, small = false) => {
     const heads = calculateHeads(num);
     const color = getCardColor(num);
     const size = small ? 'w-12 h-16 text-xs' : 'w-16 h-24 text-sm';
-    const cursor = clickable ? 'cursor-pointer' : 'opacity-70';
+    const cursor = clickable ? 'cursor-pointer card-hover' : 'opacity-70';
     const border = selected ? 'ring-4 ring-blue-600 scale-105' : '';
-    // clickable uses handleCardClick exposed from main.js
+    
     return `
     <div ${clickable ? `onclick="handleCardClick(${num})"` : ''} 
          class="${size} ${color} ${cursor} ${border} text-white rounded-lg shadow-md flex flex-col items-center justify-between p-1 transition font-bold">
@@ -93,7 +76,7 @@ const renderHome = () => `
 
             <div class="bg-amber-50 p-4 rounded-lg text-sm text-gray-700">
                 <h3 class="font-bold mb-2">📖 Règles rapides :</h3>
-                <ul class="list-disc pl-5">
+                <ul class="list-disc pl-5 space-y-1">
                     <li>Chaque joueur joue 1 carte par tour</li>
                     <li>Les cartes sont placées dans l'ordre croissant</li>
                     <li>Si vous êtes le 6ème d'une rangée, vous ramassez les 5 cartes</li>
@@ -108,14 +91,11 @@ const renderHome = () => `
     </div>
 `;
 
-// Join screen — now includes pseudo field AND supports invitePending.
-// when invitePending === true the code field is readonly so user keeps the invited code.
 const renderJoin = () => `
     <div class="container mx-auto px-4 py-8">
         <div class="max-w-md mx-auto bg-white rounded-xl shadow-2xl p-8">
             <h2 class="text-2xl font-bold text-center mb-6">Rejoindre une partie</h2>
 
-            <!-- Pseudo -->
             <div class="mb-4">
                 <label class="block text-sm font-semibold mb-2">Votre pseudo</label>
                 <input
@@ -128,7 +108,6 @@ const renderJoin = () => `
                 />
             </div>
 
-            <!-- Code -->
             <div class="mb-4">
                 <label class="block text-sm font-semibold mb-2">Code de la partie</label>
                 <input
@@ -145,13 +124,16 @@ const renderJoin = () => `
             </div>
 
             <button
-                onclick="(function(){ if(!state.playerName || !state.playerName.trim()){ alert('Merci d’entrer un pseudo avant de rejoindre.'); return; } joinGame(); })()"
+                id="join-btn"
                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-3 transition"
             >
                 🎮 Rejoindre la partie
             </button>
 
-            <button onclick="backToHome()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition">
+            <button
+                onclick="backToHome()"
+                class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition"
+            >
                 Retour
             </button>
         </div>
@@ -226,7 +208,6 @@ const renderGame = () => {
     const me = state.game.players.find(p => p.id === state.playerId);
     const waitingPlayers = state.game.players.filter(p => !hasPlayed(p)).map(p => p.name);
 
-    // finished
     if (state.game.status === 'finished') {
         const winner = state.game.players.reduce((min, p) => p.score < min.score ? p : min);
         return `
@@ -249,7 +230,6 @@ const renderGame = () => {
         `;
     }
 
-    // main game screen
     return `
     <div class="container mx-auto px-4 py-4">
         <div class="max-w-6xl mx-auto">
@@ -259,8 +239,15 @@ const renderGame = () => {
                     <p class="text-sm text-gray-600">Code: ${escapeHtml(state.gameCode)}</p>
                 </div>
                 <div class="flex gap-2 items-center">
-                    ${!state.isMobile ? `<button onclick="toggleDebug()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm">${state.showDebug ? '📊 Masquer Debug' : '🔍 Debug'}</button>` : ''}
-                    <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg">Quitter</button>
+                    ${!state.isMobile ? `
+                        <button onclick="toggleAnimations()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition">
+                            ${state.enableAnimations ? '🎬 Animations ON' : '⏭️ Animations OFF'}
+                        </button>
+                        <button onclick="toggleDebug()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition">
+                            ${state.showDebug ? '📊 Masquer Debug' : '🔍 Debug'}
+                        </button>
+                    ` : ''}
+                    <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition">Quitter</button>
                 </div>
             </div>
 
@@ -289,7 +276,7 @@ const renderGame = () => {
                         const totalHeads = row.reduce((s,c)=>s+calculateHeads(c),0);
                         const canClick = state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId;
                         return `
-                        <div class="flex items-center gap-3 p-2 rounded-lg ${canClick ? 'cursor-pointer hover:bg-orange-50 border-2 border-transparent hover:border-orange-500 transition' : 'border border-gray-200'}" ${canClick ? `onclick="chooseRow(${i})"` : ''}>
+                        <div id="row-${i}" class="flex items-center gap-3 p-2 rounded-lg ${canClick ? 'cursor-pointer hover:bg-orange-50 border-2 border-transparent hover:border-orange-500 transition' : 'border border-gray-200'}" ${canClick ? `onclick="chooseRow(${i})"` : ''}>
                             <span class="font-bold text-gray-700 min-w-[50px]">Rangée ${i+1}</span>
                             <div class="flex gap-1 flex-wrap flex-1">
                                 ${row.map(c=> renderCard(c, false, false, true)).join('')}
@@ -316,8 +303,6 @@ const renderGame = () => {
     </div>
     `;
 };
-
-/* ==================== Main render entry ==================== */
 
 const render = () => {
     const app = document.getElementById('app');
