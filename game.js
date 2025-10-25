@@ -84,14 +84,14 @@ const processAnimationQueue = async () => {
     }
     
     if (state.isAnimating || state.animationQueue.length === 0) return;
-    
+
     state.isAnimating = true;
-    
+
     while (state.animationQueue.length > 0) {
         const anim = state.animationQueue.shift();
         await playAnimation(anim);
     }
-    
+
     state.isAnimating = false;
     debugLog('Animation queue completed');
 };
@@ -99,7 +99,7 @@ const processAnimationQueue = async () => {
 const playAnimation = (anim) => {
     return new Promise((resolve) => {
         debugLog('Playing animation', { type: anim.type });
-        
+
         switch (anim.type) {
             case 'CARD_TO_ROW':
                 animateCardToRow(anim.data, resolve);
@@ -119,15 +119,15 @@ const playAnimation = (anim) => {
     });
 };
 
+/* ==================== NOUVELLES ANIMATIONS ==================== */
+
+// 💫 Animation : carte qui vole jusqu’à la bonne rangée
 const animateCardToRow = (data, callback) => {
     const { card, rowIndex, playerName } = data;
-    
+
     const overlay = document.getElementById('flying-cards-overlay');
-    if (!overlay) {
-        callback();
-        return;
-    }
-    
+    if (!overlay) return callback();
+
     const flyingCard = document.createElement('div');
     flyingCard.className = `${getCardColor(card)} text-white rounded-lg shadow-2xl flex flex-col items-center justify-between p-2 font-bold`;
     flyingCard.style.cssText = `
@@ -135,172 +135,190 @@ const animateCardToRow = (data, callback) => {
         width: 64px;
         height: 96px;
         z-index: 9999;
-        transition: all ${state.animationSpeed}ms cubic-bezier(0.4, 0.0, 0.2, 1);
         pointer-events: none;
+        transform-origin: center center;
+        opacity: 0;
+        transform: scale(0.5) rotate(-10deg);
+        transition: all ${state.animationSpeed}ms cubic-bezier(0.4, 0.0, 0.2, 1);
     `;
     flyingCard.innerHTML = `
         <span class="text-xl">${card}</span>
         <div>${'🐮'.repeat(calculateHeads(card))}</div>
         <div class="text-xs mt-1 truncate w-full text-center">${escapeHtml(playerName)}</div>
     `;
-    
+
     overlay.appendChild(flyingCard);
-    
+
     const startX = window.innerWidth / 2 - 32;
     const startY = window.innerHeight / 2 - 48;
     flyingCard.style.left = startX + 'px';
     flyingCard.style.top = startY + 'px';
-    flyingCard.style.opacity = '0';
-    flyingCard.style.transform = 'scale(0.5) rotate(-10deg)';
-    
-    flyingCard.offsetHeight;
-    
-    setTimeout(() => {
+
+    requestAnimationFrame(() => {
         flyingCard.style.opacity = '1';
-        flyingCard.style.transform = 'scale(1.2) rotate(0deg)';
-    }, 50);
-    
+        flyingCard.style.transform = 'scale(1.1) rotate(0deg)';
+    });
+
     setTimeout(() => {
         const targetRow = document.getElementById(`row-${rowIndex}`);
-        if (targetRow) {
-            const rect = targetRow.getBoundingClientRect();
-            const targetX = rect.right - 80;
-            const targetY = rect.top + rect.height / 2 - 48;
-            
-            flyingCard.style.left = targetX + 'px';
-            flyingCard.style.top = targetY + 'px';
-            flyingCard.style.transform = 'scale(1) rotate(0deg)';
-        }
-    }, 400);
-    
-    setTimeout(() => {
-        flyingCard.style.opacity = '0';
-        flyingCard.style.transform = 'scale(0.8)';
-        
+        if (!targetRow) return callback();
+
+        const rowCards = targetRow.querySelectorAll('.w-12');
+        const rectRow = targetRow.getBoundingClientRect();
+        const targetX = rectRow.left + 100 + rowCards.length * 50;
+        const targetY = rectRow.top + rectRow.height / 2 - 48;
+
+        flyingCard.style.left = targetX + 'px';
+        flyingCard.style.top = targetY + 'px';
+        flyingCard.style.transform = 'scale(0.9) rotate(0deg)';
+
         setTimeout(() => {
-            flyingCard.remove();
-            if (typeof render === 'function') render();
-            callback();
-        }, 200);
-    }, state.animationSpeed);
+            flyingCard.style.opacity = '0';
+            flyingCard.style.transform = 'scale(0.6)';
+            setTimeout(() => {
+                flyingCard.remove();
+                if (typeof render === 'function') render();
+                callback();
+            }, 300);
+        }, state.animationSpeed);
+    }, 300);
 };
 
+// 🧲 Animation : une rangée est ramassée (elle glisse vers le joueur)
 const animateRowPenalty = (data, callback) => {
     const { rowIndex, playerName, penaltyPoints } = data;
-    
     const targetRow = document.getElementById(`row-${rowIndex}`);
-    if (!targetRow) {
-        callback();
-        return;
-    }
-    
-    targetRow.style.transition = 'all 300ms';
-    targetRow.style.backgroundColor = '#fee2e2';
-    targetRow.style.transform = 'scale(1.05)';
-    targetRow.classList.add('shake-animation');
-    
+    if (!targetRow) return callback();
+
+    const cards = targetRow.querySelectorAll('div[class*="w-12"]');
+    const overlay = document.getElementById('flying-cards-overlay');
+
     const popup = document.createElement('div');
     popup.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white px-8 py-6 rounded-xl shadow-2xl z-[10000] font-bold text-lg bounce-in';
     popup.innerHTML = `
         <div class="text-center">
-            <div class="text-3xl mb-2">⚠️ Pénalité !</div>
-            <div class="text-lg">${escapeHtml(playerName)} ramasse</div>
+            <div class="text-3xl mb-2">⚠️ ${escapeHtml(playerName)} ramasse !</div>
             <div class="text-4xl mt-3 font-black">+${penaltyPoints} 🐮</div>
         </div>
     `;
     document.body.appendChild(popup);
-    
-    setTimeout(() => {
-        const cards = targetRow.querySelectorAll('div[class*="w-12"]');
-        cards.forEach((card, i) => {
-            setTimeout(() => {
-                card.style.transition = 'all 500ms';
-                card.style.transform = 'translateY(-100px) rotate(20deg)';
-                card.style.opacity = '0';
-            }, i * 80);
-        });
-    }, 800);
-    
+
+    cards.forEach((card, i) => {
+        const clone = card.cloneNode(true);
+        const cardRect = card.getBoundingClientRect();
+        clone.style.cssText = `
+            position: fixed;
+            left: ${cardRect.left}px;
+            top: ${cardRect.top}px;
+            width: ${cardRect.width}px;
+            height: ${cardRect.height}px;
+            z-index: 9999;
+            transition: all 800ms ease-in-out;
+        `;
+        overlay.appendChild(clone);
+
+        setTimeout(() => {
+            clone.style.transform = `translateY(${window.innerHeight / 2 - cardRect.top + 200}px) scale(0.5) rotate(${(i - 2) * 10}deg)`;
+            clone.style.opacity = '0';
+        }, i * 100);
+
+        setTimeout(() => clone.remove(), 1500 + i * 100);
+    });
+
     setTimeout(() => {
         popup.style.opacity = '0';
-        popup.style.transform = 'translate(-50%, -50%) scale(0.8)';
-        setTimeout(() => {
-            popup.remove();
-            targetRow.style.backgroundColor = '';
-            targetRow.style.transform = '';
-            targetRow.classList.remove('shake-animation');
-            if (typeof render === 'function') render();
-            callback();
-        }, 300);
-    }, state.animationSpeed + 800);
+        setTimeout(() => popup.remove(), 500);
+        if (typeof render === 'function') render();
+        callback();
+    }, 2000);
 };
 
-const animatePlayerChoice = (data, callback) => {
-    const { playerName } = data;
-    
-    const rows = document.querySelectorAll('[id^="row-"]');
-    rows.forEach(row => {
-        row.classList.add('pulse-animation');
-    });
-    
-    const msg = document.createElement('div');
-    msg.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white px-6 py-3 rounded-lg shadow-lg z-[10000] font-bold slide-up';
-    msg.innerHTML = `⏳ ${escapeHtml(playerName)} choisit une rangée...`;
-    document.body.appendChild(msg);
-    
-    const checkInterval = setInterval(() => {
-        if (!state.game.waitingForRowChoice) {
-            clearInterval(checkInterval);
-            rows.forEach(row => row.classList.remove('pulse-animation'));
-            msg.style.opacity = '0';
-            setTimeout(() => {
-                msg.remove();
-                callback();
-            }, 300);
-        }
-    }, 100);
-};
-
+// 🃏 Animation : révélation + tri + noms des joueurs
 const animateRevealCards = (data, callback) => {
     const { plays } = data;
-    
+
     const revealZone = document.createElement('div');
-    revealZone.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-[10000]';
+    revealZone.className = 'fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-[10000]';
     revealZone.style.opacity = '0';
-    revealZone.style.transition = 'opacity 400ms';
+    revealZone.style.transition = 'opacity 400ms ease';
     revealZone.innerHTML = `
-        <div class="text-center">
-            <div class="text-white text-3xl font-bold mb-6 slide-up">Cartes jouées ce tour :</div>
-            <div class="flex gap-4 flex-wrap justify-center max-w-4xl" id="reveal-cards"></div>
-        </div>
+        <div class="text-white text-3xl font-bold mb-6 slide-up">Cartes jouées ce tour :</div>
+        <div id="reveal-cards" class="flex gap-6 flex-wrap justify-center items-end max-w-5xl transition-all"></div>
+        <div id="reveal-phase-text" class="text-white text-lg mt-6 opacity-0 transition-opacity">🔢 Classement des cartes...</div>
     `;
     document.body.appendChild(revealZone);
-    
-    setTimeout(() => revealZone.style.opacity = '1', 50);
-    
+
+    setTimeout(() => (revealZone.style.opacity = '1'), 50);
     const container = document.getElementById('reveal-cards');
-    
+
     plays.forEach((play, i) => {
         setTimeout(() => {
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = 'flex flex-col items-center text-center opacity-0 transform scale-75 transition-all';
+            cardWrapper.style.transition = 'all 600ms ease';
+
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'text-white font-semibold mb-2 text-sm md:text-base';
+            nameDiv.textContent = play.playerName;
+
             const cardDiv = document.createElement('div');
-            cardDiv.className = `${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center bounce-in`;
+            cardDiv.className = `${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center`;
             cardDiv.style.cssText = 'width: 90px;';
             cardDiv.innerHTML = `
                 <div class="text-3xl mb-2">${play.card}</div>
                 <div class="text-lg mb-2">${'🐮'.repeat(calculateHeads(play.card))}</div>
-                <div class="text-sm truncate">${escapeHtml(play.playerName)}</div>
             `;
-            container.appendChild(cardDiv);
+
+            cardWrapper.appendChild(nameDiv);
+            cardWrapper.appendChild(cardDiv);
+            container.appendChild(cardWrapper);
+
+            requestAnimationFrame(() => {
+                cardWrapper.style.opacity = '1';
+                cardWrapper.style.transform = 'scale(1)';
+            });
         }, i * 250);
     });
-    
+
+    setTimeout(() => {
+        const phaseText = document.getElementById('reveal-phase-text');
+        if (phaseText) phaseText.style.opacity = '1';
+    }, plays.length * 250);
+
+    setTimeout(() => {
+        const sorted = [...plays].sort((a, b) => a.card - b.card);
+        const wrappers = Array.from(container.children);
+
+        wrappers.forEach((wrap, i) => {
+            const sortedIndex = sorted.findIndex(s => s.card === plays[i].card);
+            const translateX = (sortedIndex - i) * 110;
+            wrap.style.transform = `translateX(${translateX}px) scale(1)`;
+        });
+
+        setTimeout(() => {
+            container.innerHTML = '';
+            sorted.forEach(play => {
+                const cardWrapper = document.createElement('div');
+                cardWrapper.className = 'flex flex-col items-center text-center';
+                cardWrapper.innerHTML = `
+                    <div class="text-white font-semibold mb-2 text-sm md:text-base">${escapeHtml(play.playerName)}</div>
+                    <div class="${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center" style="width:90px;">
+                        <div class="text-3xl mb-2">${play.card}</div>
+                        <div class="text-lg mb-2">${'🐮'.repeat(calculateHeads(play.card))}</div>
+                    </div>
+                `;
+                container.appendChild(cardWrapper);
+            });
+        }, 700);
+    }, plays.length * 250 + 600);
+
     setTimeout(() => {
         revealZone.style.opacity = '0';
         setTimeout(() => {
             revealZone.remove();
             callback();
         }, 400);
-    }, plays.length * 250 + 2000);
+    }, plays.length * 250 + 3200);
 };
 
 /* ==================== FIREBASE OPERATIONS ==================== */
