@@ -13,11 +13,12 @@ let state = {
     debugLogs: [],
     showDebug: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
+    invitePending: false,
     // Système d'animations
     animationQueue: [],
     isAnimating: false,
     enableAnimations: true,
-    animationSpeed: 800 // ms par animation
+    animationSpeed: 800
 };
 
 let gameRef = null;
@@ -57,6 +58,16 @@ const shuffleDeck = () => {
 };
 
 const hasPlayed = (p) => Number.isInteger(p && p.playedCard) && p.playedCard > 0;
+
+const escapeHtml = (str) => {
+    if (str === null || typeof str === 'undefined') return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
 
 /* ==================== ANIMATION SYSTEM ==================== */
 
@@ -168,7 +179,7 @@ const animateCardToRow = (data, callback) => {
         
         setTimeout(() => {
             flyingCard.remove();
-            render();
+            if (typeof render === 'function') render();
             callback();
         }, 200);
     }, state.animationSpeed);
@@ -218,7 +229,7 @@ const animateRowPenalty = (data, callback) => {
             targetRow.style.backgroundColor = '';
             targetRow.style.transform = '';
             targetRow.classList.remove('shake-animation');
-            render();
+            if (typeof render === 'function') render();
             callback();
         }, 300);
     }, state.animationSpeed + 800);
@@ -335,7 +346,7 @@ const subscribeToGame = (code) => {
             }
         }
 
-        render();
+        if (typeof render === 'function') render();
     });
 };
 
@@ -381,7 +392,7 @@ const createGame = async () => {
     await saveGame(gameData);
     subscribeToGame(code);
     state.screen = 'lobby';
-    render();
+    if (typeof render === 'function') render();
 };
 
 const joinGame = async () => {
@@ -410,72 +421,7 @@ const joinGame = async () => {
     }
 
     const pid = Math.random().toString(36).substring(7);
-    game.turnResolved = false;
-    game.waitingForRowChoice = null;
-    game.pendingCard = null;
-    await saveGame(game);
-};
-
-const chooseRow = async (rowIndex) => {
-    debugLog('chooseRow called', { rowIndex, playerId: state.playerId });
-    
-    const snap = await database.ref('games/' + state.gameCode).once('value');
-    const game = snap.val();
-    
-    if (!game) {
-        debugLog('chooseRow: game not found');
-        return;
-    }
-
-    if (game.waitingForRowChoice !== state.playerId) {
-        debugLog('Not authorized to choose row', { allowed: game.waitingForRowChoice });
-        return;
-    }
-
-    const p = game.players.find(x => x.id === state.playerId);
-    const penaltyRow = game.rows[rowIndex];
-    const penaltyPoints = penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
-    p.score += penaltyPoints;
-
-    debugLog('Player picked up row', { player: p.name, rowIndex, penaltyPoints });
-
-    // Animation de la pénalité
-    if (state.enableAnimations) {
-        queueAnimation('ROW_PENALTY', {
-            rowIndex,
-            playerName: p.name,
-            penaltyPoints
-        });
-        await processAnimationQueue();
-    }
-
-    game.rows[rowIndex] = [game.pendingCard];
-    p.playedCard = null;
-
-    await resolveAllPlays(game);
-};
-
-const leaveGame = () => {
-    if (gameRef) gameRef.off();
-    debugLog('Leaving game', { gameCode: state.gameCode });
-    state.screen = 'home';
-    state.game = null;
-    state.gameCode = '';
-    state.playerId = null;
-    render();
-};
-
-const copyLink = () => {
-    const link = window.location.origin + window.location.pathname + '?join=' + state.gameCode;
-    navigator.clipboard.writeText(link);
-    state.copied = true;
-    debugLog('Link copied', { link });
-    render();
-    setTimeout(() => {
-        state.copied = false;
-        render();
-    }, 2000);
-};players.push({
+    game.players.push({
         id: pid,
         name: state.playerName,
         score: 0,
@@ -491,7 +437,7 @@ const copyLink = () => {
     await saveGame(game);
     subscribeToGame(state.gameCode);
     state.screen = 'lobby';
-    render();
+    if (typeof render === 'function') render();
 };
 
 const toggleReady = async () => {
@@ -544,7 +490,7 @@ const startGame = async () => {
         debugLog('Game started', { rows: state.game.rows.map(r => r[0]) });
         await saveGame(state.game);
         state.screen = 'game';
-        render();
+        if (typeof render === 'function') render();
     } catch (err) {
         debugLog('Error starting game', { error: err.message });
         alert('Erreur au démarrage : ' + err.message);
@@ -568,7 +514,7 @@ const playCard = async (card) => {
     
     debugLog('Card played', { player: p.name, card });
     await saveGame(state.game);
-    render();
+    if (typeof render === 'function') render();
 };
 
 const resolveTurn = async () => {
@@ -617,7 +563,6 @@ const resolveAllPlays = async (game) => {
 
     debugLog('resolveAllPlays with animations', { cards: plays.map(p => p.card) });
 
-    // Animation : Révéler toutes les cartes
     if (state.enableAnimations && plays.length > 0) {
         queueAnimation('REVEAL_CARDS', { plays });
         await processAnimationQueue();
@@ -700,4 +645,68 @@ const resolveAllPlays = async (game) => {
         }
     }
 
-    game.
+    game.turnResolved = false;
+    game.waitingForRowChoice = null;
+    game.pendingCard = null;
+    await saveGame(game);
+};
+
+const chooseRow = async (rowIndex) => {
+    debugLog('chooseRow called', { rowIndex, playerId: state.playerId });
+    
+    const snap = await database.ref('games/' + state.gameCode).once('value');
+    const game = snap.val();
+    
+    if (!game) {
+        debugLog('chooseRow: game not found');
+        return;
+    }
+
+    if (game.waitingForRowChoice !== state.playerId) {
+        debugLog('Not authorized to choose row', { allowed: game.waitingForRowChoice });
+        return;
+    }
+
+    const p = game.players.find(x => x.id === state.playerId);
+    const penaltyRow = game.rows[rowIndex];
+    const penaltyPoints = penaltyRow.reduce((s, c) => s + calculateHeads(c), 0);
+    p.score += penaltyPoints;
+
+    debugLog('Player picked up row', { player: p.name, rowIndex, penaltyPoints });
+
+    if (state.enableAnimations) {
+        queueAnimation('ROW_PENALTY', {
+            rowIndex,
+            playerName: p.name,
+            penaltyPoints
+        });
+        await processAnimationQueue();
+    }
+
+    game.rows[rowIndex] = [game.pendingCard];
+    p.playedCard = null;
+
+    await resolveAllPlays(game);
+};
+
+const leaveGame = () => {
+    if (gameRef) gameRef.off();
+    debugLog('Leaving game', { gameCode: state.gameCode });
+    state.screen = 'home';
+    state.game = null;
+    state.gameCode = '';
+    state.playerId = null;
+    if (typeof render === 'function') render();
+};
+
+const copyLink = () => {
+    const link = window.location.origin + window.location.pathname + '?join=' + state.gameCode;
+    navigator.clipboard.writeText(link);
+    state.copied = true;
+    debugLog('Link copied', { link });
+    if (typeof render === 'function') render();
+    setTimeout(() => {
+        state.copied = false;
+        if (typeof render === 'function') render();
+    }, 2000);
+};

@@ -1,17 +1,5 @@
 /* ==================== UI RENDERING ==================== */
 
-if (typeof state.invitePending === 'undefined') state.invitePending = false;
-
-const escapeHtml = (str) => {
-    if (str === null || typeof str === 'undefined') return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-};
-
 /* ==================== Debug panel ==================== */
 
 const renderDebugPanel = () => {
