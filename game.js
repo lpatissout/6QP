@@ -250,88 +250,59 @@ const animateRowPenalty = (data, callback) => {
     }, 2000);
 };
 
-// 🎬 Animation fluide : les cartes du reveal glissent vers leur vraie rangée
+// 🎬 Sécurisée : attend que la table soit prête avant d’animer
 const animateCardsToTable = (plays, container, callback) => {
-    const overlay = document.getElementById('flying-cards-overlay') || document.body;
+    // Attendre que la table soit disponible dans le DOM
+    const waitForTable = (tries = 0) => {
+        const rows = Array.from(document.querySelectorAll('[id^="row-"]'));
+        if (rows.length > 0) {
+            debugLog('animateCardsToTable: table found after', tries, 'checks');
+            doAnimation(rows);
+        } else if (tries < 20) {
+            setTimeout(() => waitForTable(tries + 1), 150);
+        } else {
+            console.warn('animateCardsToTable: table not found after 20 tries, skipping animation');
+            callback();
+        }
+    };
 
-    // On cherche toutes les lignes de la table déjà rendues
-    const rows = Array.from(document.querySelectorAll('[id^="row-"]'));
-    if (!rows.length) {
-        console.warn('animateCardsToTable: aucune rangée trouvée');
-        callback();
-        return;
-    }
+    const doAnimation = (rows) => {
+        const overlay = document.getElementById('flying-cards-overlay') || document.body;
 
-    // On crée des copies animées des cartes du reveal
-    const clones = Array.from(container.children).map((cardWrapper, i) => {
-        const clone = cardWrapper.cloneNode(true);
-        const rect = cardWrapper.getBoundingClientRect();
-
-        clone.style.cssText = `
-            position: fixed;
-            left: ${rect.left}px;
-            top: ${rect.top}px;
-            width: ${rect.width}px;
-            height: ${rect.height}px;
-            z-index: 9999;
-            transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-            pointer-events: none;
-            transform-origin: center center;
-        `;
-        overlay.appendChild(clone);
-        return clone;
-    });
-
-    // Supprime le conteneur du reveal (le fond sombre)
-    container.parentElement.remove();
-
-    // Pour chaque carte, déterminer la rangée cible
-    clones.forEach((clone, i) => {
-        const play = plays[i];
-        if (!play || !Number.isInteger(play.card)) return;
-
-        // Trouver la rangée où la carte va être placée (celle dont le dernier nombre est inférieur au sien)
-        let chosenRow = null;
-        let minDiff = Infinity;
-
-        rows.forEach((row, idx) => {
-            const cards = Array.from(row.querySelectorAll('div[class*="w-12"]'));
-            if (!cards.length) return;
-
-            const lastCard = parseInt(cards[cards.length - 1].textContent.trim(), 10);
-            const diff = play.card - lastCard;
-
-            if (diff > 0 && diff < minDiff) {
-                minDiff = diff;
-                chosenRow = row;
-            }
+        // On crée des copies animées des cartes du reveal
+        const clones = Array.from(container.children).map((cardWrapper, i) => {
+            const clone = cardWrapper.cloneNode(true);
+            const rect = cardWrapper.getBoundingClientRect();
+            clone.style.cssText = `
+                position: fixed;
+                left: ${rect.left}px;
+                top: ${rect.top}px;
+                width: ${rect.width}px;
+                height: ${rect.height}px;
+                z-index: 9999;
+                transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+                pointer-events: none;
+            `;
+            overlay.appendChild(clone);
+            return clone;
         });
 
-        // Si aucune rangée valide (carte inférieure à toutes) → on la dirige vers la rangée 0 visuellement
-        if (!chosenRow) chosenRow = rows[0];
+        // Supprime le fond sombre
+        container.parentElement.remove();
 
-        // Calcule la position finale de la carte dans la rangée
-        const targetRect = chosenRow.getBoundingClientRect();
-        const offsetX = targetRect.left + (chosenRow.querySelectorAll('div[class*="w-12"]').length * 50);
-        const offsetY = targetRect.top + targetRect.height / 2 - 50;
-
-        // Animation fluide
+        // Animation basique (on fera la belle version après)
         setTimeout(() => {
-            clone.style.left = `${offsetX}px`;
-            clone.style.top = `${offsetY}px`;
-            clone.style.transform = 'scale(0.55) rotate(0deg)';
-            clone.style.opacity = '0.95';
-        }, 150 * i);
-    });
+            clones.forEach(c => c.style.opacity = '0');
+            setTimeout(() => {
+                clones.forEach(c => c.remove());
+                debugLog('animateCardsToTable: animation done, callback triggered');
+                callback();
+            }, 500);
+        }, 800);
+    };
 
-    // 🧹 Nettoyage progressif
-    setTimeout(() => {
-        clones.forEach((c, i) => {
-            setTimeout(() => c.remove(), i * 100);
-        });
-        debugLog('Reveal animation complete and synced for all players (rows targeted)');
-        callback();
-    }, 2300 + plays.length * 150);
+    // Lance le watcher
+    waitForTable();
 };
 
 
