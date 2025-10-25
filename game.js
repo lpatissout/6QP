@@ -148,14 +148,17 @@ const animateWaitingForChoice = (data, callback) => {
     
     debugLog('Waiting for player choice', { playerName });
     
-    // Pour le joueur qui doit choisir : efface les cartes révélées
+    // Pour le joueur qui doit choisir : efface les cartes révélées immédiatement
     if (state.game.waitingForRowChoice === state.playerId) {
-        state.revealedCards = null;
-        if (typeof render === 'function') render();
+        setTimeout(() => {
+            state.revealedCards = null;
+            if (typeof render === 'function') render();
+            callback();
+        }, 100);
+    } else {
+        // Pour les autres : les cartes restent affichées
+        callback();
     }
-    // Pour les autres : les cartes restent affichées
-    
-    callback();
 };
 
 // 🎯 Animation : le joueur a choisi sa rangée
@@ -360,6 +363,11 @@ const subscribeToGame = (code) => {
         debugLog('Firebase update received', { status: data.status });
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
+
+        // Si le joueur doit choisir une rangée, on efface les cartes révélées
+        if (state.game.waitingForRowChoice === state.playerId && state.revealedCards) {
+            state.revealedCards = null;
+        }
 
         if (data.status === 'playing' && state.screen !== 'game') {
             debugLog('Switching to game screen (Firebase status playing)');
