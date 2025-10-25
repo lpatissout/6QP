@@ -250,28 +250,28 @@ const animateRowPenalty = (data, callback) => {
     }, 2000);
 };
 
-// 🃏 Animation de révélation des cartes — synchronisée entre tous les joueurs
+// 🃏 Animation de révélation + transition fluide vers la table
 const animateRevealCards = (data, callback) => {
     const { plays } = data;
 
-    // Crée un fond contrasté semi-transparent
+    // 🟪 Création du fond sombre
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-[10000] transition-opacity';
     overlay.style.opacity = '0';
     document.body.appendChild(overlay);
 
-    // Titre
+    // 🏷️ Titre
     const title = document.createElement('div');
     title.className = 'text-white text-3xl font-bold mb-8';
     title.textContent = 'Cartes jouées ce tour';
     overlay.appendChild(title);
 
-    // Conteneur des cartes
+    // 📦 Conteneur des cartes au centre
     const container = document.createElement('div');
     container.className = 'flex gap-8 justify-center flex-wrap';
     overlay.appendChild(container);
 
-    // Affiche les cartes avec noms et une animation d'apparition douce
+    // ✨ Apparition séquentielle des cartes avec noms
     plays.forEach((play, i) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-center text-center opacity-0 scale-75 transition-all duration-300';
@@ -283,38 +283,81 @@ const animateRevealCards = (data, callback) => {
             </div>
         `;
         container.appendChild(wrapper);
-
-        // Apparition séquentielle des cartes
         setTimeout(() => {
             wrapper.style.opacity = '1';
             wrapper.style.transform = 'scale(1)';
         }, i * 200);
     });
 
-    // Apparition du fond noir
+    // 🌙 Apparition du fond sombre
     setTimeout(() => (overlay.style.opacity = '1'), 50);
 
-    // Durée totale d'affichage avant disparition
-    const revealDuration = 2000 + plays.length * 200; // durée d'apparition + maintien
-    const uniformPause = 1000; // ⏳ délai supplémentaire pour la synchro entre hôte et invités
+    // 🕒 Maintien de la révélation avant la transition
+    const revealDuration = 2000 + plays.length * 200;
 
-    // Animation de disparition + pause de synchronisation
+    // 🔄 Étape suivante : disparition douce du fond + glissement vers la table
     setTimeout(() => {
         overlay.style.opacity = '0';
-
-        // Donne le temps à la transition de s'estomper avant de retirer l'overlay
         setTimeout(() => {
-            overlay.remove();
-
-            // Pause supplémentaire pour s'assurer que tout le monde (hôte et invités)
-            // reste aligné temporellement avant que les cartes se déplacent
-            setTimeout(() => {
-                debugLog('Reveal animation complete and synced for all players');
-                callback();
-            }, uniformPause);
-
-        }, 600);
+            animateCardsToTable(plays, container, callback);
+        }, 800);
     }, revealDuration);
+};
+
+// 🎬 Fonction utilitaire : fait glisser les cartes du centre vers la table
+const animateCardsToTable = (plays, container, callback) => {
+    const table = document.getElementById('game-table');
+    if (!table) {
+        console.warn('animateCardsToTable: table not found');
+        callback();
+        return;
+    }
+
+    // Coordonnées de la table pour les animations
+    const tableRect = table.getBoundingClientRect();
+
+    // On crée des copies animées des cartes du reveal
+    const clones = Array.from(container.children).map((cardWrapper, i) => {
+        const clone = cardWrapper.cloneNode(true);
+        const rect = cardWrapper.getBoundingClientRect();
+
+        clone.style.cssText = `
+            position: fixed;
+            left: ${rect.left}px;
+            top: ${rect.top}px;
+            width: ${rect.width}px;
+            height: ${rect.height}px;
+            z-index: 9999;
+            transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+        `;
+        document.body.appendChild(clone);
+        return clone;
+    });
+
+    // Supprime le conteneur du reveal (mais les clones restent)
+    container.parentElement.remove();
+
+    // 🎞️ Anime les clones vers la table
+    clones.forEach((clone, i) => {
+        setTimeout(() => {
+            const offsetX = (i - plays.length / 2) * 50;
+            const targetX = tableRect.left + tableRect.width / 2 - 45 + offsetX;
+            const targetY = tableRect.top + tableRect.height / 2 - 60;
+
+            clone.style.left = `${targetX}px`;
+            clone.style.top = `${targetY}px`;
+            clone.style.transform = 'scale(0.5) rotate(0deg)';
+            clone.style.opacity = '0.9';
+        }, 150 * i);
+    });
+
+    // 🧹 Nettoyage + callback
+    setTimeout(() => {
+        clones.forEach(c => c.remove());
+        debugLog('Reveal animation complete and synced for all players');
+        callback();
+    }, 2000 + plays.length * 150);
 };
 
 
