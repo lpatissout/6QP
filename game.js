@@ -114,6 +114,9 @@ const playAnimation = (anim) => {
         debugLog('Playing animation', { type: anim.type });
 
         switch (anim.type) {
+            case 'REVEAL_CARDS':
+                animateRevealCards(anim.data, resolve);
+                break;
             case 'CARD_TO_ROW':
                 animateCardToRow(anim.data, resolve);
                 break;
@@ -127,6 +130,7 @@ const playAnimation = (anim) => {
                 animateInfoMessage(anim.data, resolve);
                 break;
             default:
+                debugLog('Unknown animation type, skipping', anim.type);
                 resolve();
         }
     });
