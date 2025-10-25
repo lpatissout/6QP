@@ -250,7 +250,7 @@ const animateRowPenalty = (data, callback) => {
     }, 2000);
 };
 
-// 🃏 Nouvelle animation de révélation + placement progressif
+// 🃏 Animation de révélation des cartes — synchronisée entre tous les joueurs
 const animateRevealCards = (data, callback) => {
     const { plays } = data;
 
@@ -271,7 +271,7 @@ const animateRevealCards = (data, callback) => {
     container.className = 'flex gap-8 justify-center flex-wrap';
     overlay.appendChild(container);
 
-    // Affiche les cartes avec noms
+    // Affiche les cartes avec noms et une animation d'apparition douce
     plays.forEach((play, i) => {
         const wrapper = document.createElement('div');
         wrapper.className = 'flex flex-col items-center text-center opacity-0 scale-75 transition-all duration-300';
@@ -283,23 +283,38 @@ const animateRevealCards = (data, callback) => {
             </div>
         `;
         container.appendChild(wrapper);
+
+        // Apparition séquentielle des cartes
         setTimeout(() => {
             wrapper.style.opacity = '1';
             wrapper.style.transform = 'scale(1)';
         }, i * 200);
     });
 
-    // Apparition douce du fond
+    // Apparition du fond noir
     setTimeout(() => (overlay.style.opacity = '1'), 50);
 
-    // Attend 2 secondes d'affichage avant de passer à la suite
+    // Durée totale d'affichage avant disparition
+    const revealDuration = 2000 + plays.length * 200; // durée d'apparition + maintien
+    const uniformPause = 1000; // ⏳ délai supplémentaire pour la synchro entre hôte et invités
+
+    // Animation de disparition + pause de synchronisation
     setTimeout(() => {
         overlay.style.opacity = '0';
+
+        // Donne le temps à la transition de s'estomper avant de retirer l'overlay
         setTimeout(() => {
             overlay.remove();
-            callback();
+
+            // Pause supplémentaire pour s'assurer que tout le monde (hôte et invités)
+            // reste aligné temporellement avant que les cartes se déplacent
+            setTimeout(() => {
+                debugLog('Reveal animation complete and synced for all players');
+                callback();
+            }, uniformPause);
+
         }, 600);
-    }, 2000 + plays.length * 200);
+    }, revealDuration);
 };
 
 
