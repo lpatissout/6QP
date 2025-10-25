@@ -1,6 +1,5 @@
 /* ==================== MAIN APP INITIALIZATION ==================== */
 
-// Gestion des interactions UI
 window.handleCardClick = (card) => {
     const p = state.game?.players.find(x => x.id === state.playerId);
     if (!p) {
@@ -12,7 +11,6 @@ window.handleCardClick = (card) => {
         return;
     }
 
-    // Double-click pour confirmer
     if (state.selectedCard === card) {
         playCard(card);
     } else {
@@ -24,7 +22,7 @@ window.handleCardClick = (card) => {
 
 window.showJoinScreen = () => {
     state.screen = 'join';
-    state.invitePending = false; // écran "Rejoindre" manuel
+    state.invitePending = false;
     render();
 };
 
@@ -37,6 +35,24 @@ window.backToHome = () => {
 window.toggleDebug = () => {
     state.showDebug = !state.showDebug;
     debugLog('Debug panel toggled', { showDebug: state.showDebug });
+    render();
+};
+
+window.toggleAnimations = () => {
+    state.enableAnimations = !state.enableAnimations;
+    debugLog('Animations toggled', { enableAnimations: state.enableAnimations });
+    
+    // Afficher un message de confirmation
+    const msg = document.createElement('div');
+    msg.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-3 rounded-lg shadow-lg z-[10000] font-semibold slide-up';
+    msg.textContent = state.enableAnimations ? '🎬 Animations activées' : '⏭️ Animations désactivées';
+    document.body.appendChild(msg);
+    
+    setTimeout(() => {
+        msg.style.opacity = '0';
+        setTimeout(() => msg.remove(), 300);
+    }, 2000);
+    
     render();
 };
 
@@ -56,22 +72,24 @@ window.chooseRow = chooseRow;
 window.leaveGame = leaveGame;
 window.copyLink = copyLink;
 
-// ==================== INITIALISATION ==================== //
-
+// Initialisation
 document.addEventListener('DOMContentLoaded', () => {
-    debugLog('App initialized', { isMobile: state.isMobile });
+    debugLog('App initialized', { 
+        isMobile: state.isMobile, 
+        animationsEnabled: state.enableAnimations 
+    });
 
-    // Détection d’un lien d’invitation
+    // Détection d'un lien d'invitation
     const urlParams = new URLSearchParams(window.location.search);
     const joinCode = urlParams.get('join');
 
     if (joinCode) {
         state.joinCode = joinCode.toUpperCase();
         state.screen = 'join';
-        state.invitePending = true; // ✅ indique qu’on vient d’une invitation
+        state.invitePending = true;
         debugLog('Join code detected in URL', { joinCode: state.joinCode });
 
-        // Nettoyer l’URL (retirer ?join=)
+        // Nettoyer l'URL
         setTimeout(() => {
             const cleanUrl = window.location.origin + window.location.pathname;
             window.history.replaceState({}, document.title, cleanUrl);
@@ -83,16 +101,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Premier rendu
     render();
 
-    // Détection du redimensionnement (mobile / desktop)
+    // Détection du redimensionnement
     window.addEventListener('resize', () => {
         const wasMobile = state.isMobile;
         state.isMobile = window.innerWidth < 768;
         if (wasMobile !== state.isMobile) {
             debugLog('Mobile state changed', { isMobile: state.isMobile });
-            if (state.isMobile) state.showDebug = false;
+            if (state.isMobile) {
+                state.showDebug = false;
+            }
             render();
         }
     });
 
-    console.log('✅ 6 qui prend! ready to play');
+    console.log('✅ 6 qui prend! ready to play (with animations 🎬)');
 });
