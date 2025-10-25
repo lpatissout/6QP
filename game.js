@@ -451,6 +451,7 @@ const toggleReady = async () => {
     await saveGame(state.game);
 };
 
+/* ==== CORRIGÉ : ajout de async ici ==== */
 const startGame = async () => {
     if (state.game.hostId !== state.playerId || state.game.players.length < 2) {
         console.warn('startGame: unauthorized or not enough players');
@@ -496,6 +497,7 @@ const startGame = async () => {
         alert('Erreur au démarrage : ' + err.message);
     }
 };
+/* ===================================== */
 
 const playCard = async (card) => {
     const p = state.game.players.find(x => x.id === state.playerId);
