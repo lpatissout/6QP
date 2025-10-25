@@ -335,6 +335,13 @@ const subscribeToGame = (code) => {
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
+        // 🟢 NOUVEAU : si la partie passe en "playing", tout le monde affiche l'écran de jeu
+        if (data.status === 'playing' && state.screen !== 'game') {
+            debugLog('Switching to game screen (Firebase status playing)');
+            state.screen = 'game';
+            if (typeof render === 'function') render();
+        }
+
         // 🔄 S’abonner aux animations globales une fois que la partie démarre
         if (data.status === 'playing' && !state.subscribedAnimations) {
             subscribeToAnimations(code);
@@ -359,6 +366,7 @@ const subscribeToGame = (code) => {
         if (typeof render === 'function') render();
     });
 };
+
 
 /* ==================== GLOBAL ANIMATIONS CHANNEL ==================== */
 const subscribeToAnimations = (code) => {
