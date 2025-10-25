@@ -45,6 +45,46 @@ const renderCard = (num, selected = false, clickable = true, small = false) => {
     `;
 };
 
+/* ==================== Overlay de révélation des cartes ==================== */
+
+const renderRevealOverlay = () => {
+    if (!state.revealedCards || state.revealedCards.length === 0) return '';
+    
+    const isWaitingForMyChoice = state.game.waitingForRowChoice === state.playerId;
+    
+    // Si c'est à moi de choisir, on n'affiche PAS l'overlay
+    if (isWaitingForMyChoice) return '';
+    
+    return `
+    <div id="reveal-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-[10000] flex items-center justify-center transition-opacity duration-500" style="opacity: 1;">
+        <div class="text-center">
+            <h2 class="text-white text-3xl font-bold mb-8 animate-pulse">
+                🎴 Cartes jouées ce tour
+            </h2>
+            <div class="flex gap-6 justify-center items-end flex-wrap">
+                ${state.revealedCards.map(play => {
+                    const heads = calculateHeads(play.card);
+                    const color = getCardColor(play.card);
+                    return `
+                    <div class="text-center transform transition-all duration-300 hover:scale-105" data-revealed-card="${play.card}">
+                        <div class="${color} text-white rounded-lg shadow-2xl flex flex-col items-center justify-between p-3 font-bold w-24 h-32 mb-2 bounce-in">
+                            <span class="text-3xl">${play.card}</span>
+                            <div class="text-2xl">${'🐮'.repeat(heads)}</div>
+                        </div>
+                        <div class="text-white font-semibold text-lg">${escapeHtml(play.name)}</div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+            ${state.game.waitingForRowChoice ? 
+                `<p class="text-white text-xl mt-8 animate-pulse">⏳ En attente de ${escapeHtml(state.game.players.find(p => p.id === state.game.waitingForRowChoice)?.name || 'un joueur')}...</p>` 
+                : ''
+            }
+        </div>
+    </div>
+    `;
+};
+
 /* ==================== Screens ==================== */
 
 const renderHome = () => `
@@ -120,7 +160,7 @@ const renderJoin = () => `
                     maxlength="6"
                     ${state.invitePending ? 'readonly' : ''}
                 />
-                ${state.invitePending ? '<div class="text-sm text-gray-500 mt-2">Vous avez été invité — vérifiez votre pseudo puis cliquez sur Rejoindre.</div>' : ''}
+                ${state.invitePending ? '<div class="text-sm text-gray-500 mt-2">Vous avez été invité – vérifiez votre pseudo puis cliquez sur Rejoindre.</div>' : ''}
             </div>
 
             <button
@@ -231,6 +271,8 @@ const renderGame = () => {
     }
 
     return `
+    ${renderRevealOverlay()}
+    
     <div class="container mx-auto px-4 py-4">
         <div class="max-w-6xl mx-auto">
             <div class="bg-white rounded-lg shadow-lg p-4 mb-4 flex justify-between items-center">
@@ -241,7 +283,7 @@ const renderGame = () => {
                 <div class="flex gap-2 items-center">
                     ${!state.isMobile ? `
                         <button onclick="toggleAnimations()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition">
-                            ${state.enableAnimations ? '🎬 Animations ON' : '⏭️ Animations OFF'}
+                            ${state.enableAnimations ? '🎬 Animations ON' : '⭐️ Animations OFF'}
                         </button>
                         <button onclick="toggleDebug()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition">
                             ${state.showDebug ? '📊 Masquer Debug' : '🔍 Debug'}
@@ -267,7 +309,7 @@ const renderGame = () => {
                 <h3 class="font-bold mb-4 text-lg">Rangées de cartes :</h3>
 
                 ${state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId
-                    ? `<div class="bg-orange-100 border-2 border-orange-500 rounded-lg p-4 mb-4 text-center font-bold text-orange-700">⚠️ Votre carte (${state.game.pendingCard}) est trop petite ! Choisissez une rangée à ramasser :</div>`
+                    ? `<div class="bg-orange-100 border-2 border-orange-500 rounded-lg p-4 mb-4 text-center font-bold text-orange-700 animate-pulse">⚠️ Votre carte (${state.game.pendingCard}) est trop petite ! Choisissez une rangée à ramasser :</div>`
                     : state.game.waitingForRowChoice ? `<div class="bg-blue-100 border-2 border-blue-500 rounded-lg p-4 mb-4 text-center font-bold text-blue-700">⏳ ${escapeHtml(state.game.players.find(p=>p.id===state.game.waitingForRowChoice)?.name||'Un joueur')} doit choisir une rangée...</div>` : ''
                 }
 
@@ -276,7 +318,7 @@ const renderGame = () => {
                         const totalHeads = row.reduce((s,c)=>s+calculateHeads(c),0);
                         const canClick = state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId;
                         return `
-                        <div id="row-${i}" class="flex items-center gap-3 p-2 rounded-lg ${canClick ? 'cursor-pointer hover:bg-orange-50 border-2 border-transparent hover:border-orange-500 transition' : 'border border-gray-200'}" ${canClick ? `onclick="chooseRow(${i})"` : ''}>
+                        <div id="row-${i}" class="flex items-center gap-3 p-2 rounded-lg ${canClick ? 'cursor-pointer hover:bg-orange-50 border-2 border-transparent hover:border-orange-500 transition pulse-animation' : 'border border-gray-200'}" ${canClick ? `onclick="chooseRow(${i})"` : ''}>
                             <span class="font-bold text-gray-700 min-w-[50px]">Rangée ${i+1}</span>
                             <div class="flex gap-1 flex-wrap flex-1">
                                 ${row.map(c=> renderCard(c, false, false, true)).join('')}
