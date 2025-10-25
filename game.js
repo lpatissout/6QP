@@ -117,6 +117,7 @@ const playAnimation = (anim) => {
             case 'REVEAL_CARDS':
                 animateRevealCards(anim.data, resolve);
                 break;
+
             case 'CARD_TO_ROW':
                 animateCardToRow(anim.data, resolve);
                 break;
@@ -130,7 +131,6 @@ const playAnimation = (anim) => {
                 animateInfoMessage(anim.data, resolve);
                 break;
             default:
-                debugLog('Unknown animation type, skipping', anim.type);
                 resolve();
         }
     });
@@ -250,59 +250,61 @@ const animateRowPenalty = (data, callback) => {
     }, 2000);
 };
 
-// 🎬 Sécurisée : attend que la table soit prête avant d’animer
-const animateCardsToTable = (plays, container, callback) => {
-    // Attendre que la table soit disponible dans le DOM
-    const waitForTable = (tries = 0) => {
-        const rows = Array.from(document.querySelectorAll('[id^="row-"]'));
-        if (rows.length > 0) {
-            debugLog('animateCardsToTable: table found after', tries, 'checks');
-            doAnimation(rows);
-        } else if (tries < 20) {
-            setTimeout(() => waitForTable(tries + 1), 150);
-        } else {
-            console.warn('animateCardsToTable: table not found after 20 tries, skipping animation');
-            callback();
-        }
-    };
+// 🃏 Animation : révélation + tri + noms des joueurs
+// 🃏 Animation de révélation + transition fluide vers la table
+const animateRevealCards = (data, callback) => {
+    const { plays } = data;
 
-    const doAnimation = (rows) => {
-        const overlay = document.getElementById('flying-cards-overlay') || document.body;
+    // 🟪 Création du fond sombre
+    const overlay = document.createElement('div');
+    overlay.id = 'reveal-overlay';
+    overlay.className = 'fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-[10000] transition-opacity';
+    overlay.style.opacity = '0';
+    document.body.appendChild(overlay);
 
-        // On crée des copies animées des cartes du reveal
-        const clones = Array.from(container.children).map((cardWrapper, i) => {
-            const clone = cardWrapper.cloneNode(true);
-            const rect = cardWrapper.getBoundingClientRect();
-            clone.style.cssText = `
-                position: fixed;
-                left: ${rect.left}px;
-                top: ${rect.top}px;
-                width: ${rect.width}px;
-                height: ${rect.height}px;
-                z-index: 9999;
-                transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
-                pointer-events: none;
-            `;
-            overlay.appendChild(clone);
-            return clone;
-        });
+    // 🏷️ Titre
+    const title = document.createElement('div');
+    title.className = 'text-white text-3xl font-bold mb-8';
+    title.textContent = 'Cartes jouées ce tour';
+    overlay.appendChild(title);
 
-        // Supprime le fond sombre
-        container.parentElement.remove();
+    // 📦 Conteneur des cartes au centre
+    const container = document.createElement('div');
+    container.className = 'flex gap-8 justify-center flex-wrap';
+    overlay.appendChild(container);
 
-        // Animation basique (on fera la belle version après)
+    // ✨ Apparition séquentielle des cartes avec noms
+    plays.forEach((play, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex flex-col items-center text-center opacity-0 scale-75 transition-all duration-300 reveal-card-wrapper';
+        wrapper.innerHTML = `
+            <div class="text-white text-sm font-semibold mb-2">${escapeHtml(play.name)}</div>
+            <div class="${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center w-[90px] h-[120px] flex flex-col justify-center items-center">
+                <div class="text-3xl mb-1">${play.card}</div>
+                <div class="text-lg">${'🐮'.repeat(calculateHeads(play.card))}</div>
+            </div>
+        `;
+        container.appendChild(wrapper);
+
         setTimeout(() => {
-            clones.forEach(c => c.style.opacity = '0');
-            setTimeout(() => {
-                clones.forEach(c => c.remove());
-                debugLog('animateCardsToTable: animation done, callback triggered');
-                callback();
-            }, 500);
-        }, 800);
-    };
+            wrapper.style.opacity = '1';
+            wrapper.style.transform = 'scale(1)';
+        }, i * 200);
+    });
 
-    // Lance le watcher
-    waitForTable();
+    // 🌙 Apparition du fond sombre
+    setTimeout(() => (overlay.style.opacity = '1'), 50);
+
+    // 🕒 Maintien de la révélation avant la transition
+    const revealDuration = 2000 + plays.length * 200;
+
+    // 🔄 Étape suivante : disparition douce du fond + glissement vers la table
+    setTimeout(() => {
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            animateCardsToTable(plays, container, callback);
+        }, 600);
+    }, revealDuration);
 };
 
 
@@ -325,7 +327,7 @@ const saveGame = async (data) => {
 const subscribeToGame = (code) => {
     if (!database) return;
     if (gameRef) gameRef.off();
-    
+
     gameRef = database.ref('games/' + code);
     gameRef.on('value', async (snap) => {
         const data = snap.val();
@@ -372,17 +374,30 @@ const subscribeToGame = (code) => {
 
 
 /* ==================== GLOBAL ANIMATIONS CHANNEL ==================== */
+/* ==================== GLOBAL ANIMATIONS CHANNEL (corrected sync) ==================== */
+
 const subscribeToAnimations = (code) => {
     if (!database) return;
+
+    if (!state.playedAnimations) state.playedAnimations = new Set();
+
     const animRef = database.ref('animations/' + code);
     animRef.on('value', (snap) => {
         const anim = snap.val();
-        if (anim && anim.timestamp > Date.now() - 5000) {
-            queueAnimation(anim.type, anim);
-            processAnimationQueue();
-        }
+        if (!anim) return;
+
+        const animKey = `${anim.type}_${anim.timestamp}`;
+        if (state.playedAnimations.has(animKey)) return;
+        state.playedAnimations.add(animKey);
+
+        if (anim.timestamp < Date.now() - 10000) return;
+
+        debugLog('New animation received from Firebase', anim);
+        queueAnimation(anim.type, anim);
+        processAnimationQueue();
     });
 };
+
 
 /* ==================== GAME ACTIONS ==================== */
 const createGame = async () => {
@@ -556,10 +571,10 @@ const playCard = async (card) => {
 /* ==================== TOUR DE JEU ==================== */
 const resolveTurn = async () => {
     debugLog('resolveTurn called');
-    
+
     const snap = await database.ref('games/' + state.gameCode).once('value');
     const game = snap.val();
-    
+
     if (!game) {
         console.warn('resolveTurn: no game');
         return;
@@ -574,7 +589,12 @@ const resolveTurn = async () => {
 
     debugLog('Resolving plays', { plays: plays.map(p => p.card) });
 
-    // 💡 Étape 1 : révéler les cartes avant toute décision
+    if (!plays.length) {
+        await saveGame(game);
+        return;
+    }
+
+    // Trigger global REVEAL_CARDS animation via Firebase
     if (state.enableAnimations && plays.length > 0) {
         await database.ref('animations/' + state.gameCode).set({
             type: 'REVEAL_CARDS',
@@ -583,41 +603,34 @@ const resolveTurn = async () => {
         });
     }
 
-    // 🕒 Étape 1.5 : pause d’1 seconde pour laisser la révélation visible
-    await new Promise(r => setTimeout(r, 1000));
+    // We still call local reveal to ensure host shows immediately (queue will ignore duplicates)
+    // After reveal, determine if anyone must choose a row
+    // Small delay to ensure visual coherence
+    await new Promise(r => setTimeout(r, 500));
 
-    // 💡 Étape 2 : traitement des cartes jouées dans l’ordre
     for (const play of plays) {
         const validRows = game.rows
             .map((r, i) => ({ i, last: r[r.length - 1], diff: play.card - r[r.length - 1] }))
             .filter(x => x.diff > 0);
 
-        // 🟦 CAS SPÉCIAL : carte trop basse → le joueur doit choisir une ligne
         if (!validRows.length) {
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
 
-            // 🔹 Étape 3 : informer tous les joueurs de la situation
             await database.ref('animations/' + state.gameCode).set({
                 type: 'INFO_MESSAGE',
-                text: `${play.name} a joué une carte inférieure et doit choisir une rangée.`,
+                data: { text: `${play.name} a joué une carte inférieure et doit choisir une rangée.` },
                 timestamp: Date.now()
             });
-
-            // ⏳ Pause d'une seconde avant de permettre le choix au joueur concerné
-            await new Promise(r => setTimeout(r, 1000));
 
             await saveGame(game);
             debugLog('Player must choose row', { playerId: play.pid, card: play.card });
             return;
         }
-
-        // 🟩 Si le joueur peut jouer normalement → rien à changer ici
-        // (le code continue plus bas dans resolveAllPlays)
     }
 
-    // 💡 Étape 4 : toutes les cartes peuvent être placées → on résout normalement
+    // Otherwise resolve placements
     await resolveAllPlays(game);
 };
 
@@ -628,6 +641,9 @@ const resolveAllPlays = async (game) => {
         .sort((a, b) => a.card - b.card);
 
     debugLog('resolveAllPlays with animations', { cards: plays.map(p => p.card) });
+
+    if (state.enableAnimations && plays.length > 0) {
+        }
 
     for (const play of plays) {
         const p = game.players.find(x => x.id === play.pid);
@@ -645,7 +661,16 @@ const resolveAllPlays = async (game) => {
                 queueAnimation('PLAYER_CHOOSE', { playerName: p.name });
                 await processAnimationQueue();
             }
+            // 🔄 Diffuser l’animation de ramassage à tous les joueurs
+            await database.ref('animations/' + state.gameCode).set({
+                type: 'ROW_PENALTY',
+                rowIndex,
+                playerName: p.name,
+                penaltyPoints,
+                timestamp: Date.now()
+            });
 
+            
             debugLog('Player must choose during resolve', { player: p.name, card: play.card });
             return;
         }
