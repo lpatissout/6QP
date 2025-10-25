@@ -130,6 +130,11 @@ const playAnimation = (anim) => {
 const animateRevealCards = (data, callback) => {
     const { plays } = data;
     
+    if (!plays || plays.length === 0) {
+        callback();
+        return;
+    }
+    
     // Stocke les cartes révélées dans le state
     state.revealedCards = plays;
     
@@ -146,17 +151,19 @@ const animateRevealCards = (data, callback) => {
 const animateWaitingForChoice = (data, callback) => {
     const { playerName } = data;
     
-    debugLog('Waiting for player choice', { playerName });
+    debugLog('Waiting for player choice', { playerName, isMe: state.game.waitingForRowChoice === state.playerId });
     
     // Pour le joueur qui doit choisir : efface les cartes révélées immédiatement
     if (state.game.waitingForRowChoice === state.playerId) {
         setTimeout(() => {
+            debugLog('Clearing revealed cards for player who must choose');
             state.revealedCards = null;
             if (typeof render === 'function') render();
             callback();
         }, 100);
     } else {
         // Pour les autres : les cartes restent affichées
+        debugLog('Keeping revealed cards for waiting players');
         callback();
     }
 };
@@ -165,8 +172,11 @@ const animateWaitingForChoice = (data, callback) => {
 const animatePlayerChoseRow = (data, callback) => {
     const { card, rowIndex, playerName, penaltyPoints } = data;
     
-    // Efface les cartes révélées sauf celle du joueur qui choisit
-    state.revealedCards = state.revealedCards.filter(p => p.card === card);
+    // Vérifier que revealedCards existe avant de filtrer
+    if (state.revealedCards && state.revealedCards.length > 0) {
+        // Efface les cartes révélées sauf celle du joueur qui choisit
+        state.revealedCards = state.revealedCards.filter(p => p.card === card);
+    }
     
     if (typeof render === 'function') render();
     
@@ -185,19 +195,27 @@ const animatePlayerChoseRow = (data, callback) => {
         popup.style.opacity = '0';
         setTimeout(() => popup.remove(), 500);
         
-        // Fondu de l'overlay
+        // Fondu de l'overlay (s'il existe)
         const overlay = document.getElementById('reveal-overlay');
         if (overlay) {
             overlay.style.opacity = '0';
             setTimeout(() => {
                 // Animation de la carte vers la rangée
-                animateCardToRowDirect(card, rowIndex, playerName, () => {
+                if (state.revealedCards && state.revealedCards.length > 0) {
+                    animateCardToRowDirect(card, rowIndex, playerName, () => {
+                        state.revealedCards = null;
+                        if (typeof render === 'function') render();
+                        callback();
+                    });
+                } else {
                     state.revealedCards = null;
                     if (typeof render === 'function') render();
                     callback();
-                });
+                }
             }, 500);
         } else {
+            state.revealedCards = null;
+            if (typeof render === 'function') render();
             callback();
         }
     }, 2000);
@@ -206,6 +224,13 @@ const animatePlayerChoseRow = (data, callback) => {
 // 💫 Animation : toutes les cartes vont vers leurs rangées
 const animateCardsToRows = (data, callback) => {
     const { plays } = data;
+    
+    if (!plays || plays.length === 0) {
+        state.revealedCards = null;
+        if (typeof render === 'function') render();
+        callback();
+        return;
+    }
     
     // Fondu de l'overlay noir
     const overlay = document.getElementById('reveal-overlay');
