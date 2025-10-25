@@ -262,7 +262,6 @@ const animateCardsToTable = (plays, container, callback) => {
         return;
     }
 
-    
     // On crée des copies animées des cartes du reveal
     const clones = Array.from(container.children).map((cardWrapper, i) => {
         const clone = cardWrapper.cloneNode(true);
