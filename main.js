@@ -115,4 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     console.log('✅ 6 qui prend! ready to play (with animations 🎬)');
+    // Liaison du bouton "Rejoindre la partie"
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'join-btn') {
+            if (!state.playerName || !state.playerName.trim()) {
+                alert("Merci d'entrer un pseudo avant de rejoindre.");
+                return;
+            }
+            if (!state.joinCode || !state.joinCode.trim()) {
+                alert("Merci de renseigner un code de partie.");
+                return;
+            }
+            joinGame();
+        }
+    });
 });

@@ -124,13 +124,16 @@ const renderJoin = () => `
             </div>
 
             <button
-                onclick="(function(){ if(!state.playerName || !state.playerName.trim()){ alert('Merci d\'entrer un pseudo avant de rejoindre.'); return; } joinGame(); })()"
+                id="join-btn"
                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-3 transition"
             >
                 🎮 Rejoindre la partie
             </button>
 
-            <button onclick="backToHome()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition">
+            <button
+                onclick="backToHome()"
+                class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition"
+            >
                 Retour
             </button>
         </div>
