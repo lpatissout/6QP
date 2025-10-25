@@ -281,14 +281,6 @@ const renderGame = () => {
                     <p class="text-sm text-gray-600">Code: ${escapeHtml(state.gameCode)}</p>
                 </div>
                 <div class="flex gap-2 items-center">
-                    ${!state.isMobile ? `
-                        <button onclick="toggleAnimations()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition">
-                            ${state.enableAnimations ? '🎬 Animations ON' : '⭐️ Animations OFF'}
-                        </button>
-                        <button onclick="toggleDebug()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm transition">
-                            ${state.showDebug ? '📊 Masquer Debug' : '🔍 Debug'}
-                        </button>
-                    ` : ''}
                     <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition">Quitter</button>
                 </div>
             </div>
