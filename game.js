@@ -82,7 +82,7 @@ const processAnimationQueue = async () => {
         state.animationQueue = [];
         return;
     }
-    
+
     if (state.isAnimating || state.animationQueue.length === 0) return;
 
     state.isAnimating = true;
@@ -94,6 +94,19 @@ const processAnimationQueue = async () => {
 
     state.isAnimating = false;
     debugLog('Animation queue completed');
+};
+
+// 💬 Animation : message d'information global
+const animateInfoMessage = (data, callback) => {
+    const msg = document.createElement('div');
+    msg.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white px-6 py-4 rounded-lg shadow-lg text-lg font-bold z-[10000] slide-up';
+    msg.textContent = data.text;
+    document.body.appendChild(msg);
+    setTimeout(() => {
+        msg.style.opacity = '0';
+        setTimeout(() => msg.remove(), 400);
+        callback();
+    }, 3500);
 };
 
 const playAnimation = (anim) => {
@@ -110,8 +123,8 @@ const playAnimation = (anim) => {
             case 'PLAYER_CHOOSE':
                 animatePlayerChoice(anim.data, resolve);
                 break;
-            case 'REVEAL_CARDS':
-                animateRevealCards(anim.data, resolve);
+            case 'INFO_MESSAGE':
+                animateInfoMessage(anim.data, resolve);
                 break;
             default:
                 resolve();
@@ -352,8 +365,9 @@ const subscribeToGame = (code) => {
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
-        if (data.status === 'playing') {
-            state.screen = 'game';
+        if (data.status === 'playing' && !state.subscribedAnimations) {
+            subscribeToAnimations(code);
+            state.subscribedAnimations = true;
         }
 
         if (state.game.status === 'playing' && !state.game.turnResolved && oldStatus === 'playing') {
@@ -365,6 +379,19 @@ const subscribeToGame = (code) => {
         }
 
         if (typeof render === 'function') render();
+    });
+};
+
+/* ==================== GLOBAL ANIMATIONS CHANNEL ==================== */
+const subscribeToAnimations = (code) => {
+    if (!database) return;
+    const animRef = database.ref('animations/' + code);
+    animRef.on('value', (snap) => {
+        const anim = snap.val();
+        if (anim && anim.timestamp > Date.now() - 5000) {
+            queueAnimation(anim.type, anim);
+            processAnimationQueue();
+        }
     });
 };
 
@@ -557,21 +584,44 @@ const resolveTurn = async () => {
 
     debugLog('Resolving plays', { plays: plays.map(p => p.card) });
 
+    // 💡 Étape 1 : révéler les cartes avant toute décision
+    if (state.enableAnimations && plays.length > 0) {
+        await database.ref('animations/' + state.gameCode).set({
+            type: 'REVEAL_CARDS',
+            plays,
+            timestamp: Date.now()
+        });
+    }
+
+    // 💡 Étape 2 : traitement des cartes jouées dans l’ordre
     for (const play of plays) {
         const validRows = game.rows
             .map((r, i) => ({ i, last: r[r.length - 1], diff: play.card - r[r.length - 1] }))
             .filter(x => x.diff > 0);
 
+        // 🟦 CAS SPÉCIAL : carte trop basse → le joueur doit choisir une ligne
         if (!validRows.length) {
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
+
+            // 🔹 Étape 3 : informer tous les joueurs de la situation
+            await database.ref('animations/' + state.gameCode).set({
+                type: 'INFO_MESSAGE',
+                text: `${play.name} a joué une carte inférieure et doit choisir une rangée.`,
+                timestamp: Date.now()
+            });
+
             await saveGame(game);
             debugLog('Player must choose row', { playerId: play.pid, card: play.card });
             return;
         }
+
+        // 🟩 Si le joueur peut jouer normalement → rien à changer ici
+        // (le code continue plus bas dans resolveAllPlays)
     }
 
+    // 💡 Étape 4 : toutes les cartes peuvent être placées → on résout normalement
     await resolveAllPlays(game);
 };
 
@@ -582,11 +632,6 @@ const resolveAllPlays = async (game) => {
         .sort((a, b) => a.card - b.card);
 
     debugLog('resolveAllPlays with animations', { cards: plays.map(p => p.card) });
-
-    if (state.enableAnimations && plays.length > 0) {
-        queueAnimation('REVEAL_CARDS', { plays });
-        await processAnimationQueue();
-    }
 
     for (const play of plays) {
         const p = game.players.find(x => x.id === play.pid);
@@ -604,7 +649,7 @@ const resolveAllPlays = async (game) => {
                 queueAnimation('PLAYER_CHOOSE', { playerName: p.name });
                 await processAnimationQueue();
             }
-            
+
             debugLog('Player must choose during resolve', { player: p.name, card: play.card });
             return;
         }
