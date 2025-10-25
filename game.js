@@ -318,7 +318,7 @@ const saveGame = async (data) => {
     state.game = data;
 };
 
-/* ==================== GAME SUBSCRIPTION ==================== */
+/* ==================== SUBSCRIPTION TO GAME UPDATES ==================== */
 const subscribeToGame = (code) => {
     if (!database) return;
     if (gameRef) gameRef.off();
@@ -332,32 +332,30 @@ const subscribeToGame = (code) => {
         }
 
         debugLog('Firebase update received', { status: data.status });
-        console.log(`[DEBUG] ${state.playerName} voit le status Firebase :`, data.status);
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
-        // 🔹 Si la partie est en "playing", on s'abonne aux animations globales (une seule fois)
+        // 🔄 S’abonner aux animations globales une fois que la partie démarre
         if (data.status === 'playing' && !state.subscribedAnimations) {
             subscribeToAnimations(code);
             state.subscribedAnimations = true;
         }
 
-        // 🔹 Détection d’un passage en mode "playing" (lancement de la partie)
-        // Ce bloc assure que tous les joueurs (y compris non-hôtes) passent à l’écran de jeu
-        if (oldStatus === 'waiting' && data.status === 'playing') {
-            debugLog('Game started remotely -> switching to game screen');
-            state.screen = 'game';
-        }
-
-        // 🔹 Résolution automatique du tour si tous ont joué
-        if (state.game.status === 'playing' && !state.game.turnResolved && oldStatus === 'playing') {
+        // 🧩 Seul l'hôte déclenche la résolution du tour
+        if (
+            state.game.status === 'playing' &&
+            !state.game.turnResolved &&
+            oldStatus === 'playing' &&
+            state.playerId === state.game.hostId
+        ) {
             const allPlayed = state.game.players.every(p => hasPlayed(p));
             if (allPlayed) {
-                debugLog('All players played -> resolveTurn');
+                debugLog('All players played -> resolveTurn (by host only)');
                 await resolveTurn();
             }
         }
 
+        // 🔁 Met à jour l'affichage local
         if (typeof render === 'function') render();
     });
 };
