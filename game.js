@@ -363,6 +363,7 @@ const subscribeToGame = (code) => {
         }
 
         debugLog('Firebase update received', { status: data.status });
+        console.log(`[DEBUG] ${state.playerName} voit le status Firebase :`, data.status);
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
