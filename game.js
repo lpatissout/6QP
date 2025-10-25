@@ -246,93 +246,58 @@ const animateRowPenalty = (data, callback) => {
     }, 2000);
 };
 
-// 🃏 Animation : révélation + tri + noms des joueurs
+// 🃏 Nouvelle animation de révélation + placement progressif
 const animateRevealCards = (data, callback) => {
     const { plays } = data;
 
-    const revealZone = document.createElement('div');
-    revealZone.className = 'fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-[10000]';
-    revealZone.style.opacity = '0';
-    revealZone.style.transition = 'opacity 400ms ease';
-    revealZone.innerHTML = `
-        <div class="text-white text-3xl font-bold mb-6 slide-up">Cartes jouées ce tour :</div>
-        <div id="reveal-cards" class="flex gap-6 flex-wrap justify-center items-end max-w-5xl transition-all"></div>
-        <div id="reveal-phase-text" class="text-white text-lg mt-6 opacity-0 transition-opacity">🔢 Classement des cartes...</div>
-    `;
-    document.body.appendChild(revealZone);
+    // Crée un fond contrasté semi-transparent
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-[10000] transition-opacity';
+    overlay.style.opacity = '0';
+    document.body.appendChild(overlay);
 
-    setTimeout(() => (revealZone.style.opacity = '1'), 50);
-    const container = document.getElementById('reveal-cards');
+    // Titre
+    const title = document.createElement('div');
+    title.className = 'text-white text-3xl font-bold mb-8';
+    title.textContent = 'Cartes jouées ce tour';
+    overlay.appendChild(title);
 
+    // Conteneur des cartes
+    const container = document.createElement('div');
+    container.className = 'flex gap-8 justify-center flex-wrap';
+    overlay.appendChild(container);
+
+    // Affiche les cartes avec noms
     plays.forEach((play, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex flex-col items-center text-center opacity-0 scale-75 transition-all duration-300';
+        wrapper.innerHTML = `
+            <div class="text-white text-sm font-semibold mb-2">${escapeHtml(play.name)}</div>
+            <div class="${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center w-[90px] h-[120px] flex flex-col justify-center items-center">
+                <div class="text-3xl mb-1">${play.card}</div>
+                <div class="text-lg">${'🐮'.repeat(calculateHeads(play.card))}</div>
+            </div>
+        `;
+        container.appendChild(wrapper);
         setTimeout(() => {
-            const cardWrapper = document.createElement('div');
-            cardWrapper.className = 'flex flex-col items-center text-center opacity-0 transform scale-75 transition-all';
-            cardWrapper.style.transition = 'all 600ms ease';
-
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'text-white font-semibold mb-2 text-sm md:text-base';
-            nameDiv.textContent = play.playerName;
-
-            const cardDiv = document.createElement('div');
-            cardDiv.className = `${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center`;
-            cardDiv.style.cssText = 'width: 90px;';
-            cardDiv.innerHTML = `
-                <div class="text-3xl mb-2">${play.card}</div>
-                <div class="text-lg mb-2">${'🐮'.repeat(calculateHeads(play.card))}</div>
-            `;
-
-            cardWrapper.appendChild(nameDiv);
-            cardWrapper.appendChild(cardDiv);
-            container.appendChild(cardWrapper);
-
-            requestAnimationFrame(() => {
-                cardWrapper.style.opacity = '1';
-                cardWrapper.style.transform = 'scale(1)';
-            });
-        }, i * 250);
+            wrapper.style.opacity = '1';
+            wrapper.style.transform = 'scale(1)';
+        }, i * 200);
     });
 
+    // Apparition douce du fond
+    setTimeout(() => (overlay.style.opacity = '1'), 50);
+
+    // Attend 2 secondes d'affichage avant de passer à la suite
     setTimeout(() => {
-        const phaseText = document.getElementById('reveal-phase-text');
-        if (phaseText) phaseText.style.opacity = '1';
-    }, plays.length * 250);
-
-    setTimeout(() => {
-        const sorted = [...plays].sort((a, b) => a.card - b.card);
-        const wrappers = Array.from(container.children);
-
-        wrappers.forEach((wrap, i) => {
-            const sortedIndex = sorted.findIndex(s => s.card === plays[i].card);
-            const translateX = (sortedIndex - i) * 110;
-            wrap.style.transform = `translateX(${translateX}px) scale(1)`;
-        });
-
+        overlay.style.opacity = '0';
         setTimeout(() => {
-            container.innerHTML = '';
-            sorted.forEach(play => {
-                const cardWrapper = document.createElement('div');
-                cardWrapper.className = 'flex flex-col items-center text-center';
-                cardWrapper.innerHTML = `
-                    <div class="text-white font-semibold mb-2 text-sm md:text-base">${escapeHtml(play.playerName)}</div>
-                    <div class="${getCardColor(play.card)} text-white rounded-xl shadow-2xl p-4 font-bold text-center" style="width:90px;">
-                        <div class="text-3xl mb-2">${play.card}</div>
-                        <div class="text-lg mb-2">${'🐮'.repeat(calculateHeads(play.card))}</div>
-                    </div>
-                `;
-                container.appendChild(cardWrapper);
-            });
-        }, 700);
-    }, plays.length * 250 + 600);
-
-    setTimeout(() => {
-        revealZone.style.opacity = '0';
-        setTimeout(() => {
-            revealZone.remove();
+            overlay.remove();
             callback();
-        }, 400);
-    }, plays.length * 250 + 3200);
+        }, 600);
+    }, 2000 + plays.length * 200);
 };
+
 
 /* ==================== FIREBASE OPERATIONS ==================== */
 const saveGame = async (data) => {
@@ -575,6 +540,7 @@ const playCard = async (card) => {
     if (typeof render === 'function') render();
 };
 
+/* ==================== TOUR DE JEU ==================== */
 const resolveTurn = async () => {
     debugLog('resolveTurn called');
     
@@ -604,6 +570,9 @@ const resolveTurn = async () => {
         });
     }
 
+    // 🕒 Étape 1.5 : pause d’1 seconde pour laisser la révélation visible
+    await new Promise(r => setTimeout(r, 1000));
+
     // 💡 Étape 2 : traitement des cartes jouées dans l’ordre
     for (const play of plays) {
         const validRows = game.rows
@@ -622,6 +591,9 @@ const resolveTurn = async () => {
                 text: `${play.name} a joué une carte inférieure et doit choisir une rangée.`,
                 timestamp: Date.now()
             });
+
+            // ⏳ Pause d'une seconde avant de permettre le choix au joueur concerné
+            await new Promise(r => setTimeout(r, 1000));
 
             await saveGame(game);
             debugLog('Player must choose row', { playerId: play.pid, card: play.card });
