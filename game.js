@@ -146,10 +146,15 @@ const animateRevealCards = (data, callback) => {
 const animateWaitingForChoice = (data, callback) => {
     const { playerName } = data;
     
-    // Les cartes restent affichées, on attend juste
     debugLog('Waiting for player choice', { playerName });
     
-    // Le callback est appelé immédiatement car c'est juste un état d'attente
+    // Pour le joueur qui doit choisir : efface les cartes révélées
+    if (state.game.waitingForRowChoice === state.playerId) {
+        state.revealedCards = null;
+        if (typeof render === 'function') render();
+    }
+    // Pour les autres : les cartes restent affichées
+    
     callback();
 };
 

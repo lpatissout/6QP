@@ -52,11 +52,14 @@ const renderRevealOverlay = () => {
     
     const isWaitingForMyChoice = state.game.waitingForRowChoice === state.playerId;
     
+    // Si c'est à moi de choisir, on n'affiche PAS l'overlay
+    if (isWaitingForMyChoice) return '';
+    
     return `
     <div id="reveal-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-[10000] flex items-center justify-center transition-opacity duration-500" style="opacity: 1;">
         <div class="text-center">
             <h2 class="text-white text-3xl font-bold mb-8 animate-pulse">
-                ${isWaitingForMyChoice ? '⚠️ Votre carte est trop basse ! Choisissez une rangée !' : '🎴 Cartes jouées ce tour'}
+                🎴 Cartes jouées ce tour
             </h2>
             <div class="flex gap-6 justify-center items-end flex-wrap">
                 ${state.revealedCards.map(play => {
@@ -73,7 +76,7 @@ const renderRevealOverlay = () => {
                     `;
                 }).join('')}
             </div>
-            ${!isWaitingForMyChoice && state.game.waitingForRowChoice ? 
+            ${state.game.waitingForRowChoice ? 
                 `<p class="text-white text-xl mt-8 animate-pulse">⏳ En attente de ${escapeHtml(state.game.players.find(p => p.id === state.game.waitingForRowChoice)?.name || 'un joueur')}...</p>` 
                 : ''
             }
