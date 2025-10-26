@@ -118,9 +118,31 @@ const startGame = async () => {
     debugLog('Starting game', { players: state.game.players.length });
     
     try {
-        const game = initializeGameRound(state.game);
-        debugLog('Game started', { rows: game.rows.map(r => r[0]) });
-        await saveGame(game);
+        const deck = shuffleDeck();
+        const cardsNeeded = GAME_CONSTANTS.INITIAL_ROWS + (state.game.players.length * GAME_CONSTANTS.CARDS_PER_PLAYER);
+        
+        if (deck.length < cardsNeeded) {
+            throw new Error('Pas assez de cartes');
+        }
+
+        state.game.rows = [[deck[0]], [deck[1]], [deck[2]], [deck[3]]];
+        deck.splice(0, GAME_CONSTANTS.INITIAL_ROWS);
+        
+        state.game.players.forEach(p => {
+            p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+            p.playedCard = null;
+            debugLog('Dealt hand', { player: p.name, handSize: p.hand.length });
+        });
+
+        state.game.status = 'playing';
+        state.game.round = 1;
+        state.game.currentTurn = 1;
+        state.game.turnResolved = false;
+        state.game.waitingForRowChoice = null;
+        state.game.pendingCard = null;
+
+        debugLog('Game started', { rows: state.game.rows.map(r => r[0]) });
+        await saveGame(state.game);
         state.screen = 'game';
         if (typeof render === 'function') render();
     } catch (err) {
