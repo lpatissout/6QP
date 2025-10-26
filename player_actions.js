@@ -15,7 +15,27 @@ const createGame = async () => {
     state.gameCode = code;
     state.playerId = pid;
 
-    const gameData = createGameData(code, pid, state.playerName);
+    const gameData = {
+        code,
+        status: 'waiting',
+        hostId: pid,
+        players: [{
+            id: pid,
+            name: state.playerName,
+            score: 0,
+            ready: false,
+            hand: [],
+            playedCard: null
+        }],
+        rows: [],
+        round: 0,
+        chat: [],
+        currentTurn: 0,
+        maxRounds: 6,
+        turnResolved: false,
+        waitingForRowChoice: null,
+        pendingCard: null
+    };
 
     debugLog('Creating game', { code, host: state.playerName });
     await saveGame(gameData);
