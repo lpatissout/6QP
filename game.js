@@ -1,3 +1,8 @@
+/* ==================== GAME LOGIC - UTILITIES ==================== */
+
+// IMPORTANT: Ces fonctions sont déjà définies dans state.js
+// On les réutilise ici pour éviter les duplications
+
 /* ==================== GAME RULES - PURE LOGIC ==================== */
 
 const resolveTurn = async () => {

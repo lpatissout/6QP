@@ -222,6 +222,7 @@ const chooseRow = async (rowIndex) => {
         return;
     }
 
+    // Continuer la résolution des cartes restantes
     await resolveAllPlays(game);
 };
 
@@ -286,6 +287,7 @@ const handleGameUpdate = async (data, oldStatus) => {
         state.screen = 'game';
     }
 
+    // CORRECTION: Vérifier que l'hôte déclenche la résolution quand tous ont joué
     if (
         state.game.status === 'playing' &&
         !state.game.turnResolved &&
@@ -295,6 +297,7 @@ const handleGameUpdate = async (data, oldStatus) => {
         const allPlayed = state.game.players.every(p => hasPlayed(p));
         if (allPlayed) {
             debugLog('All players played -> resolveTurn (by host only)');
+            // resolveTurn() est maintenant dans game.js et accessible globalement
             await resolveTurn();
         }
     }

@@ -68,6 +68,7 @@ const escapeHtml = (str) => {
         .replace(/'/g, '&#039;');
 };
 
+// Fonctions de jeu partagées (utilisées aussi dans game.js)
 const calculatePenaltyPoints = (cards) => {
     return cards.reduce((sum, card) => sum + calculateHeads(card), 0);
 };
