@@ -3,8 +3,8 @@
 // Gestionnaires d'événements UI
 window.handleCardClick = (card) => {
     const p = state.game?.players.find(x => x.id === state.playerId);
-    if (!p) {
-        console.warn('handleCardClick: player not found');
+    if (!p || p.isSpectator) {
+        console.warn('handleCardClick: player not found or is spectator');
         return;
     }
     if (hasPlayed(p)) {
@@ -66,6 +66,7 @@ window.clearDebugLogs = () => {
 // Exposition des fonctions globales
 window.createGame = createGame;
 window.joinGame = joinGame;
+window.joinAsSpectator = joinAsSpectator; // NOUVEAU
 window.toggleReady = toggleReady;
 window.startGame = startGame;
 window.playCard = playCard;
@@ -73,6 +74,7 @@ window.chooseRow = chooseRow;
 window.leaveGame = leaveGame;
 window.copyLink = copyLink;
 window.restartGame = restartGame;
+window.analyzeRowChoice = analyzeRowChoice; // NOUVEAU
 
 // Initialisation de l'application
 document.addEventListener('DOMContentLoaded', () => {
@@ -116,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    console.log('✅ 6 qui prend! ready to play (with animations 🎬)');
+    console.log('✅ 6 qui prend! ready to play (with animations 🎬 and spectator mode 👁️)');
     
     // Liaison du bouton "Rejoindre la partie"
     document.addEventListener('click', (e) => {

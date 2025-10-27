@@ -18,7 +18,8 @@ const state = {
     enableAnimations: true,
     animationSpeed: 800,
     revealedCards: null,
-    animationsDisabledReason: null
+    animationsDisabledReason: null,
+    isSpectator: false // NOUVEAU: Mode spectateur
 };
 
 /* ==================== PURE HELPERS ==================== */

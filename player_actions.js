@@ -25,7 +25,8 @@ const createGame = async () => {
             score: 0,
             ready: false,
             hand: [],
-            playedCard: null
+            playedCard: null,
+            isSpectator: false
         }],
         rows: [],
         round: 0,
@@ -34,7 +35,8 @@ const createGame = async () => {
         maxRounds: 6,
         turnResolved: false,
         waitingForRowChoice: null,
-        pendingCard: null
+        pendingCard: null,
+        turnHistory: [] // NOUVEAU: Historique des actions
     };
 
     debugLog('Creating game', { code, host: state.playerName });
@@ -44,6 +46,52 @@ const createGame = async () => {
     subscribeToAnimations(code, handleAnimation);
     
     state.screen = 'lobby';
+    if (typeof render === 'function') render();
+};
+
+// NOUVEAU: Rejoindre en spectateur
+const joinAsSpectator = async () => {
+    if (!state.playerName || !state.playerName.trim() || !state.joinCode || !state.joinCode.trim()) {
+        alert('Entrez pseudo et code !');
+        return;
+    }
+    if (!database) {
+        alert('Base de données non initialisée');
+        return;
+    }
+
+    const normalized = state.joinCode.toUpperCase();
+    debugLog('Attempting to join as spectator', { joinCode: normalized });
+    
+    const game = await loadGame(normalized);
+    
+    if (!game) {
+        alert('Partie introuvable !');
+        return;
+    }
+
+    const pid = Math.random().toString(36).substring(7);
+    game.players.push({
+        id: pid,
+        name: state.playerName + ' 👁️',
+        score: 0,
+        ready: true, // Les spectateurs sont toujours prêts
+        hand: [],
+        playedCard: null,
+        isSpectator: true
+    });
+    
+    state.gameCode = normalized;
+    state.playerId = pid;
+    state.isSpectator = true;
+    
+    debugLog('Joined as spectator', { gameCode: normalized, playerId: pid });
+    await saveGame(game);
+    
+    subscribeToGame(state.gameCode, handleGameUpdate);
+    subscribeToAnimations(state.gameCode, handleAnimation);
+    
+    state.screen = game.status === 'waiting' ? 'lobby' : 'game';
     if (typeof render === 'function') render();
 };
 
@@ -78,11 +126,13 @@ const joinGame = async () => {
         score: 0,
         ready: false,
         hand: [],
-        playedCard: null
+        playedCard: null,
+        isSpectator: false
     });
     
     state.gameCode = normalized;
     state.playerId = pid;
+    state.isSpectator = false;
     
     debugLog('Joined game', { gameCode: normalized, playerId: pid });
     await saveGame(game);
@@ -96,8 +146,8 @@ const joinGame = async () => {
 
 const toggleReady = async () => {
     const p = state.game.players.find(x => x.id === state.playerId);
-    if (!p) {
-        console.warn('toggleReady: player not found');
+    if (!p || p.isSpectator) {
+        console.warn('toggleReady: player not found or is spectator');
         return;
     }
     p.ready = !p.ready;
@@ -106,20 +156,23 @@ const toggleReady = async () => {
 };
 
 const startGame = async () => {
-    if (state.game.hostId !== state.playerId || state.game.players.length < 2) {
+    if (state.game.hostId !== state.playerId || state.game.players.filter(p => !p.isSpectator).length < 2) {
         console.warn('startGame: unauthorized or not enough players');
         return;
     }
-    if (!state.game.players.every(p => p.ready)) {
+    
+    // Vérifier que tous les JOUEURS (pas spectateurs) sont prêts
+    const activePlayers = state.game.players.filter(p => !p.isSpectator);
+    if (!activePlayers.every(p => p.ready)) {
         alert('Tous les joueurs doivent être prêts !');
         return;
     }
 
-    debugLog('Starting game', { players: state.game.players.length });
+    debugLog('Starting game', { players: activePlayers.length });
     
     try {
         const deck = shuffleDeck();
-        const cardsNeeded = GAME_CONSTANTS.INITIAL_ROWS + (state.game.players.length * GAME_CONSTANTS.CARDS_PER_PLAYER);
+        const cardsNeeded = GAME_CONSTANTS.INITIAL_ROWS + (activePlayers.length * GAME_CONSTANTS.CARDS_PER_PLAYER);
         
         if (deck.length < cardsNeeded) {
             throw new Error('Pas assez de cartes');
@@ -129,9 +182,13 @@ const startGame = async () => {
         deck.splice(0, GAME_CONSTANTS.INITIAL_ROWS);
         
         state.game.players.forEach(p => {
-            p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+            if (!p.isSpectator) {
+                p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+            } else {
+                p.hand = [];
+            }
             p.playedCard = null;
-            debugLog('Dealt hand', { player: p.name, handSize: p.hand.length });
+            debugLog('Dealt hand', { player: p.name, handSize: p.hand.length, isSpectator: p.isSpectator });
         });
 
         state.game.status = 'playing';
@@ -140,6 +197,7 @@ const startGame = async () => {
         state.game.turnResolved = false;
         state.game.waitingForRowChoice = null;
         state.game.pendingCard = null;
+        state.game.turnHistory = [];
 
         debugLog('Game started', { rows: state.game.rows.map(r => r[0]) });
         await saveGame(state.game);
@@ -153,8 +211,8 @@ const startGame = async () => {
 
 const playCard = async (card) => {
     const p = state.game.players.find(x => x.id === state.playerId);
-    if (!p) {
-        console.warn('playCard: player not found');
+    if (!p || p.isSpectator) {
+        console.warn('playCard: player not found or is spectator');
         return;
     }
     if (hasPlayed(p)) {
@@ -166,9 +224,62 @@ const playCard = async (card) => {
     p.hand = p.hand.filter(c => c !== card);
     state.selectedCard = null;
     
+    // NOUVEAU: Ajouter à l'historique
+    if (!state.game.turnHistory) state.game.turnHistory = [];
+    state.game.turnHistory.push({
+        turn: state.game.currentTurn,
+        round: state.game.round,
+        player: p.name,
+        card: card,
+        action: 'played',
+        timestamp: Date.now()
+    });
+    
     debugLog('Card played', { player: p.name, card });
     await saveGame(state.game);
     if (typeof render === 'function') render();
+};
+
+// NOUVEAU: Analyse stratégique pour le choix de rangée
+const analyzeRowChoice = (rowIndex, playerCard) => {
+    const row = state.game.rows[rowIndex];
+    const penaltyPoints = calculatePenaltyPoints(row);
+    
+    // Analyser les cartes des autres joueurs
+    const otherPlayers = state.game.players.filter(p => 
+        !p.isSpectator && 
+        p.id !== state.playerId && 
+        p.hand && p.hand.length > 0
+    );
+    
+    let strategicAdvice = '';
+    let potentialVictims = [];
+    
+    // Vérifier si en choisissant cette rangée, on peut piéger un autre joueur
+    otherPlayers.forEach(opponent => {
+        // Simuler : si on place notre carte ici, quelles cartes de l'adversaire pourraient tomber dedans ?
+        const minOpponentCard = Math.min(...opponent.hand);
+        const maxOpponentCard = Math.max(...opponent.hand);
+        
+        if (minOpponentCard > playerCard && minOpponentCard < playerCard + 10) {
+            potentialVictims.push({
+                name: opponent.name,
+                reason: `${opponent.name} a probablement des petites cartes (${minOpponentCard}-${maxOpponentCard}) qui pourraient tomber sur cette rangée`
+            });
+        }
+    });
+    
+    if (potentialVictims.length > 0) {
+        strategicAdvice = `🎯 Choix stratégique ! ` + potentialVictims[0].reason;
+    } else {
+        strategicAdvice = `Cette rangée vous coûtera ${penaltyPoints} points`;
+    }
+    
+    return {
+        penaltyPoints,
+        strategicAdvice,
+        potentialVictims
+    };
 };
 
 const chooseRow = async (rowIndex) => {
@@ -190,6 +301,19 @@ const chooseRow = async (rowIndex) => {
     const penaltyRow = [...game.rows[rowIndex]];
     const penaltyPoints = calculatePenaltyPoints(penaltyRow);
     p.score += penaltyPoints;
+    
+    // NOUVEAU: Ajouter à l'historique
+    if (!game.turnHistory) game.turnHistory = [];
+    game.turnHistory.push({
+        turn: game.currentTurn,
+        round: game.round,
+        player: p.name,
+        card: game.pendingCard,
+        action: 'chose_row',
+        rowIndex: rowIndex,
+        penaltyPoints: penaltyPoints,
+        timestamp: Date.now()
+    });
 
     debugLog('Player picked up row', { 
         player: p.name, 
@@ -234,12 +358,14 @@ const restartGame = async () => {
 
     debugLog('Restarting game');
     
-    // Réinitialiser les scores
+    // Réinitialiser les scores (sauf spectateurs)
     state.game.players.forEach(p => {
-        p.score = 0;
+        if (!p.isSpectator) {
+            p.score = 0;
+            p.ready = false;
+        }
         p.hand = [];
         p.playedCard = null;
-        p.ready = false;
     });
 
     state.game.status = 'waiting';
@@ -250,6 +376,7 @@ const restartGame = async () => {
     state.game.waitingForRowChoice = null;
     state.game.pendingCard = null;
     state.game.finishReason = null;
+    state.game.turnHistory = [];
 
     await saveGame(state.game);
     state.screen = 'lobby';
@@ -263,6 +390,7 @@ const leaveGame = () => {
     state.game = null;
     state.gameCode = '';
     state.playerId = null;
+    state.isSpectator = false;
     state.revealedCards = null;
     state.animationsDisabledReason = null;
     if (typeof render === 'function') render();
@@ -294,10 +422,12 @@ const handleGameUpdate = async (data, oldStatus) => {
         oldStatus === 'playing' &&
         state.playerId === state.game.hostId
     ) {
-        const allPlayed = state.game.players.every(p => hasPlayed(p));
+        // Ne compter que les joueurs actifs (pas spectateurs)
+        const activePlayers = state.game.players.filter(p => !p.isSpectator);
+        const allPlayed = activePlayers.every(p => hasPlayed(p));
+        
         if (allPlayed) {
             debugLog('All players played -> resolveTurn (by host only)');
-            // resolveTurn() est maintenant dans game.js et accessible globalement
             await resolveTurn();
         }
     }

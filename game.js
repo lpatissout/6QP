@@ -152,17 +152,38 @@ const advanceGamePhase = async (game) => {
             game.finishReason = 'rounds_completed';
             debugLog('Game finished - all rounds completed');
         } else {
-            // NOUVELLE MANCHE : pas de points attribués ici
+            // NOUVELLE MANCHE
             const deck = shuffleDeck();
             game.rows = [[deck[0]], [deck[1]], [deck[2]], [deck[3]]];
             deck.splice(0, GAME_CONSTANTS.INITIAL_ROWS);
             
             game.players.forEach(p => {
-                p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+                // Ne pas distribuer aux spectateurs
+                if (!p.isSpectator) {
+                    p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+                }
                 p.playedCard = null;
             });
             game.currentTurn = 1;
-            debugLog('New round started', { round: game.round, noPointsAdded: true, animationsStillEnabled: state.enableAnimations });
+            debugLog('New round started', { round: game.round });
+            
+            // CORRECTION ERREUR 1 : Réinitialiser les animations pour tous
+            game.roundJustStarted = true;
+            await saveGame(game);
+            
+            // Attendre un peu pour que tous les joueurs reçoivent la mise à jour
+            await new Promise(r => setTimeout(r, 500));
+            
+            // Animation de nouvelle manche pour TOUS les joueurs
+            if (state.enableAnimations) {
+                await publishAnimation(state.gameCode, 'NEW_ROUND', { 
+                    round: game.round,
+                    timestamp: Date.now() // Force la synchronisation
+                });
+                await new Promise(r => setTimeout(r, 2000));
+            }
+            
+            game.roundJustStarted = false;
         }
     }
 
@@ -174,7 +195,10 @@ const advanceGamePhase = async (game) => {
 
 const initializeGameRound = (game) => {
     const deck = shuffleDeck();
-    const cardsNeeded = GAME_CONSTANTS.INITIAL_ROWS + (game.players.length * GAME_CONSTANTS.CARDS_PER_PLAYER);
+    
+    // Compter uniquement les joueurs non-spectateurs
+    const activePlayers = game.players.filter(p => !p.isSpectator);
+    const cardsNeeded = GAME_CONSTANTS.INITIAL_ROWS + (activePlayers.length * GAME_CONSTANTS.CARDS_PER_PLAYER);
     
     if (deck.length < cardsNeeded) {
         throw new Error('Pas assez de cartes');
@@ -184,9 +208,13 @@ const initializeGameRound = (game) => {
     deck.splice(0, GAME_CONSTANTS.INITIAL_ROWS);
     
     game.players.forEach(p => {
-        p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+        if (!p.isSpectator) {
+            p.hand = deck.splice(0, GAME_CONSTANTS.CARDS_PER_PLAYER).sort((a, b) => a - b);
+        } else {
+            p.hand = [];
+        }
         p.playedCard = null;
-        debugLog('Dealt hand', { player: p.name, handSize: p.hand.length });
+        debugLog('Dealt hand', { player: p.name, handSize: p.hand.length, isSpectator: p.isSpectator });
     });
 
     game.status = 'playing';
