@@ -103,7 +103,6 @@ const playAnimation = (anim) => {
 
 /* ==================== HELPER: BANNIÈRES EXPLICATIVES ==================== */
 
-// ✅ CORRECTION : Supprimer les translations qui causent le dédoublement
 const showExplanationBanner = (title, message, bgColor = 'bg-blue-500', duration = 2000) => {
     const banner = document.createElement('div');
     banner.className = `fixed top-20 left-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-xl z-[10002] max-w-md`;
@@ -235,14 +234,12 @@ const animateCardToRow = (data, callback) => {
             flyingCard.style.transform = 'scale(0.8)';
             setTimeout(() => {
                 flyingCard.remove();
-                // ✅ CORRECTION : Ne pas render pendant l'animation, attendre le callback
                 callback();
             }, 300);
         }, state.animationSpeed);
     }, 300);
 };
 
-// ✅ CORRECTION MAJEURE : Animation 6ème carte améliorée
 const animate6thCardPenalty = (data, callback) => {
     const { card, rowIndex, playerName, penaltyPoints } = data;
     
@@ -376,37 +373,127 @@ const animateWaitingForChoice = (data, callback) => {
     }
 };
 
+// ✅ NOUVELLE ANIMATION : Identique à animate6thCardPenalty
 const animatePlayerChoseRow = (data, callback) => {
     const { card, rowIndex, playerName, penaltyPoints } = data;
     
+    debugLog('Animating player chose row (like 6th card)', { card, rowIndex, playerName, penaltyPoints });
+    
     showExplanationBanner(
-        `💡 ${escapeHtml(playerName)} choisit la rangée ${rowIndex + 1}`,
+        `⚠️ ${escapeHtml(playerName)} ramasse la rangée ${rowIndex + 1}`,
         `Carte trop petite (${card}) : ramasse ${penaltyPoints} points de pénalité`,
         'bg-purple-600',
         2500
     );
     
-    if (state.revealedCards && state.revealedCards.length > 0) {
-        state.revealedCards = state.revealedCards.filter(p => p.card === card);
+    const targetRow = document.getElementById(`row-${rowIndex}`);
+    if (!targetRow) {
+        callback();
+        return;
     }
+
+    const overlay = document.getElementById('flying-cards-overlay');
+    const color = getCardColor(card);
+
+    // 1. Faire apparaître la carte au centre de l'écran
+    const flyingCard = document.createElement('div');
+    flyingCard.className = `${color} text-white rounded-lg shadow-2xl flex flex-col items-center justify-center font-bold`;
+    flyingCard.style.cssText = `
+        position: fixed;
+        left: ${window.innerWidth / 2 - 24}px;
+        top: ${window.innerHeight / 2 - 32}px;
+        width: 48px;
+        height: 64px;
+        z-index: 10000;
+        opacity: 0;
+        transform: scale(1.5);
+        transition: all 600ms ease-out;
+    `;
+    flyingCard.innerHTML = `<span class="text-2xl">${card}</span>`;
+    overlay.appendChild(flyingCard);
     
-    if (typeof render === 'function') render();
-    
+    // 2. Animation d'apparition et déplacement vers la fin de la rangée
     setTimeout(() => {
-        const overlay = document.getElementById('reveal-overlay');
-        if (overlay) {
-            overlay.style.opacity = '0';
+        const cards = targetRow.querySelectorAll('div[class*="w-12"]');
+        const rowRect = targetRow.getBoundingClientRect();
+        
+        // Position après la dernière carte
+        const targetX = cards.length > 0 
+            ? cards[cards.length - 1].getBoundingClientRect().right + 2
+            : rowRect.left + 100;
+        const targetY = rowRect.top + rowRect.height / 2 - 32;
+        
+        flyingCard.style.left = targetX + 'px';
+        flyingCard.style.top = targetY + 'px';
+        flyingCard.style.opacity = '1';
+        flyingCard.style.transform = 'scale(1)';
+    }, 100);
+
+    // 3. Pause pour montrer la carte en place (1 seconde)
+    setTimeout(() => {
+        // 4. Faire disparaître les autres cartes de la rangée
+        const cards = targetRow.querySelectorAll('div[class*="w-12"]');
+        cards.forEach((cardEl, i) => {
+            const clone = cardEl.cloneNode(true);
+            const cardRect = cardEl.getBoundingClientRect();
+            clone.style.cssText = `
+                position: fixed;
+                left: ${cardRect.left}px;
+                top: ${cardRect.top}px;
+                width: ${cardRect.width}px;
+                height: ${cardRect.height}px;
+                z-index: 9998;
+                transition: all 600ms ease-in-out;
+            `;
+            overlay.appendChild(clone);
+
             setTimeout(() => {
-                state.revealedCards = null;
-                if (typeof render === 'function') render();
-                callback();
-            }, 500);
-        } else {
-            state.revealedCards = null;
-            if (typeof render === 'function') render();
-            callback();
-        }
-    }, ANIMATION_CONSTANTS.PENALTY_DISPLAY_DURATION);
+                clone.style.opacity = '0';
+                clone.style.transform = 'scale(0.5) translateY(-30px)';
+            }, i * 50);
+
+            setTimeout(() => clone.remove(), 800);
+        });
+
+        // 5. Déplacer la carte volante vers la position de première carte
+        setTimeout(() => {
+            const rowRect = targetRow.getBoundingClientRect();
+            flyingCard.style.left = (rowRect.left + 100) + 'px';
+        }, 300);
+        
+        // 6. Afficher le popup de pénalité
+        setTimeout(() => {
+            const popup = document.createElement('div');
+            popup.className = 'fixed top-1/2 left-1/2 bg-purple-600 text-white px-8 py-6 rounded-xl shadow-2xl z-[10001] font-bold text-lg';
+            popup.style.cssText = `
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 0;
+                transition: all 0.3s ease-out;
+            `;
+            popup.innerHTML = `
+                <div class="text-center">
+                    <div class="text-3xl mb-2">⚠️ ${escapeHtml(playerName)} ramasse !</div>
+                    <div class="text-4xl mt-3 font-black">+${penaltyPoints} 🐮</div>
+                </div>
+            `;
+            document.body.appendChild(popup);
+
+            requestAnimationFrame(() => {
+                popup.style.transform = 'translate(-50%, -50%) scale(1)';
+                popup.style.opacity = '1';
+            });
+
+            setTimeout(() => {
+                popup.style.opacity = '0';
+                setTimeout(() => {
+                    popup.remove();
+                    flyingCard.remove();
+                    if (typeof render === 'function') render();
+                    callback();
+                }, 300);
+            }, 1500);
+        }, 800);
+    }, 1000);
 };
 
 const animateNewRound = (data, callback) => {

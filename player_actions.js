@@ -357,7 +357,13 @@ const chooseRow = async (rowIndex) => {
         cardBeingPlaced
     });
 
-    // ✅ Animation de ramassage avec la carte qui s'anime vers la rangée
+    // ✅ D'abord faire disparaître l'overlay de révélation
+    if (state.enableAnimations) {
+        await publishAnimation(state.gameCode, 'FADE_OVERLAY', {});
+        await new Promise(r => setTimeout(r, ANIMATION_CONSTANTS.FADE_DURATION));
+    }
+    
+    // ✅ Animation de ramassage (comme 6ème carte)
     if (state.enableAnimations) {
         await publishAnimation(state.gameCode, 'PLAYER_CHOSE_ROW', {
             card: cardBeingPlaced,
@@ -365,7 +371,7 @@ const chooseRow = async (rowIndex) => {
             playerName: p.name,
             penaltyPoints
         });
-        await new Promise(r => setTimeout(r, 2500));
+        await new Promise(r => setTimeout(r, 3500)); // Temps complet de l'animation
     }
 
     // ✅ IMPORTANT : Placer la carte sur la rangée maintenant vide

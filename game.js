@@ -1,33 +1,4 @@
-const chooseRow = async (rowIndex) => {
-    debugLog('chooseRow called', { rowIndex, playerId: state.playerId });
-    
-    const game = await loadGame(state.gameCode);
-    
-    if (!game) {
-        debugLog('chooseRow: game not found');
-        return;
-    }
-
-    if (game.waitingForRowChoice !== state.playerId) {
-        debugLog('Not authorized to choose row', { allowed: game.waitingForRowChoice });
-        return;
-    }
-
-    const p = game.players.find(x => x.id === state.playerId);
-    const cardBeingPlaced = game.pendingCard; // ✅ Sauvegarder la carte avant de la traiter
-    const penaltyRow = [...game.rows[rowIndex]];
-    const penaltyPoints = calculatePenaltyPoints(penaltyRow);
-    p.score += penaltyPoints;
-    
-    if (!game.turnHistory) game.turnHistory = [];
-    game.turnHistory.push({
-        turn: game.currentTurn,
-        round: game.round,
-        player: p.name,
-        card: cardBeingPlaced,
-        action: 'chose_row',
-        rowIndex: rowIndex,
-        penaltyPoints:/* ==================== GAME LOGIC - UTILITIES ==================== */
+/* ==================== GAME LOGIC - UTILITIES ==================== */
 
 // IMPORTANT: Ces fonctions sont déjà définies dans state.js
 // On les réutilise ici pour éviter les duplications
