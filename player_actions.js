@@ -23,10 +23,15 @@ const handleGameUpdate = async (data, oldStatus) => {
         state.screen = 'game';
     }
 
-    // CORRECTION: Vérifier que l'hôte déclenche la résolution quand tous ont joué
+    // ✅ Ne résoudre QUE si :
+    // - On est l'hôte
+    // - Pas déjà résolu
+    // - Personne n'attend de choisir
+    // - Tous les joueurs ont joué
     if (
         state.game.status === 'playing' &&
         !state.game.turnResolved &&
+        !state.game.waitingForRowChoice &&  // ✅ AJOUT
         oldStatus === 'playing' &&
         state.playerId === state.game.hostId
     ) {
@@ -35,6 +40,11 @@ const handleGameUpdate = async (data, oldStatus) => {
         
         if (allPlayed) {
             debugLog('All players played -> resolveTurn (by host only)');
+            
+            // ✅ Marquer comme "en cours de résolution" pour éviter les doubles
+            state.game.turnResolved = true;
+            await saveGame(state.game);
+            
             await resolveTurn();
         }
     }

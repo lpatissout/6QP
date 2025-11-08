@@ -357,6 +357,22 @@ const renderLobby = () => {
 };
 
 const renderGame = () => {
+    // ✅ SÉCURITÉ : Vérifier que le jeu est chargé
+    if (!state.game || !state.game.players || !Array.isArray(state.game.players)) {
+        return `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <div class="text-xl">⏳ Chargement de la partie...</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ✅ AJOUT : Vérification de sécurité
+    if (!state.game || !state.game.players) {
+        console.warn('Game or players not loaded yet');
+        return '<div class="container mx-auto p-8 text-center">Chargement...</div>';
+    }
     const me = state.game.players.find(p => p.id === state.playerId);
     const activePlayers = state.game.players.filter(p => !p.isSpectator);
     const waitingPlayers = activePlayers.filter(p => !hasPlayed(p));
