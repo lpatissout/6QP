@@ -5,7 +5,7 @@ const state = {
     gameCode: '',
     playerName: '',
     joinCode: '',
-    game: null,
+    game: null,  // L'objet complet de la partie
     playerId: null,
     selectedCard: null,
     copied: false,
@@ -22,7 +22,7 @@ const state = {
     isSpectator: false
 };
 
-/* ==================== PURE HELPERS ==================== */
+/* ==================== PUR HELPERS ==================== */
 
 const debugLog = (msg, data = null) => {
     const time = new Date().toLocaleTimeString();
@@ -41,7 +41,7 @@ const calculateHeads = (card) => {
     return 1;
 };
 
-// ✅ CORRECTION : Couleur basée sur le nombre de têtes, pas sur la valeur
+// Couleur basée sur le nombre de têtes, pas sur la valeur
 const getCardColor = (card) => {
     const heads = calculateHeads(card);
     if (heads === 1) return 'bg-green-500';      // 1 tête = vert
@@ -59,7 +59,8 @@ const shuffleDeck = () => {
     return deck;
 };
 
-const hasPlayed = (p) => Number.isInteger(p && p.playedCard) && p.playedCard > 0;
+const hasPlayed = (p) =>
+    Number.isInteger(p && p.playedCard) && p.playedCard > 0;
 
 const escapeHtml = (str) => {
     if (str === null || typeof str === 'undefined') return '';
@@ -68,20 +69,40 @@ const escapeHtml = (str) => {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+        .replace(/'/g, "&#039;");
 };
 
 // Fonctions de jeu partagées (utilisées aussi dans game.js)
 const calculatePenaltyPoints = (cards) => {
-    return cards.reduce((sum, card) => sum + calculateHeads(card), 0);
+    return Array.isArray(cards)
+        ? cards.reduce((sum, card) => sum + calculateHeads(card), 0)
+        : 0;
 };
 
 const findValidRows = (card, rows) => {
+    if (!Array.isArray(rows)) return [];
     return rows
         .map((r, i) => ({ i, last: r[r.length - 1], diff: card - r[r.length - 1] }))
         .filter(x => x.diff > 0);
 };
 
 const findBestRow = (validRows) => {
+    if (!Array.isArray(validRows) || validRows.length === 0) return null;
     return validRows.reduce((min, cur) => cur.diff < min.diff ? cur : min);
 };
+
+/* ========= Patch de protection lorsque game est modifié ========== */
+// À appeler à chaque fois qu'on set ou remplace l'objet de game :
+function setGameSafe(newGame) {
+    // Protéger contre tout attribut pouvant créer un bug .map
+    if (!newGame || typeof newGame !== 'object') newGame = {};
+    if (!Array.isArray(newGame.rows)) newGame.rows = [];
+    if (!Array.isArray(newGame.players)) newGame.players = [];
+    // Ajoute d'autres tableaux s'ils sont utilisés dans .map ailleurs
+    state.game = newGame;
+}
+
+// Exemple d'utilisation à chaque réception/initialisation de partie
+// Remplace : state.game = dataFromFirebase;
+// Par : setGameSafe(dataFromFirebase);
+
