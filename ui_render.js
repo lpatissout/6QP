@@ -373,14 +373,32 @@ const renderGame = () => {
         `;
     }
     
-    // ✅ SÉCURITÉ : Vérifier que rows existe (peut être undefined pendant transition de manche)
-    if (!state.game.rows || !Array.isArray(state.game.rows)) {
+    // ✅ SÉCURITÉ : Vérifier que rows existe ET est un tableau valide
+    if (!state.game.rows || !Array.isArray(state.game.rows) || state.game.rows.length === 0) {
         console.warn('Game rows not ready, waiting for round initialization');
         return `
             <div class="container mx-auto px-4 py-8">
                 <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
                     <div class="text-xl mb-4">🎯 Préparation de la manche ${state.game.round || ''}...</div>
                     <div class="text-gray-600">Distribution des cartes en cours</div>
+                    <div class="mt-4">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ✅ Vérifier que chaque row est bien un tableau
+    const validRows = state.game.rows.every(row => Array.isArray(row));
+    if (!validRows) {
+        console.error('Invalid rows structure detected', state.game.rows);
+        return `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <div class="text-xl text-red-600 mb-4">⚠️ Erreur de synchronisation</div>
+                    <div class="text-gray-600 mb-4">Veuillez patienter...</div>
+                    <button onclick="location.reload()" class="bg-orange-500 text-white px-6 py-2 rounded-lg">Recharger</button>
                 </div>
             </div>
         `;
@@ -518,7 +536,7 @@ const renderGame = () => {
                     <h3 class="font-bold mb-3 sm:mb-4 text-base sm:text-lg">Votre main :</h3>
                     ${hasPlayed(me)
                         ? `<div class="text-center py-4 sm:py-8">
-                            <p class="text-xl sm:text-2xl mb-2">✓ Vous avez joué votre carte !</p>
+                            <p class="text-xl sm:text-2xl mb-2">✔ Vous avez joué votre carte !</p>
                             <p class="text-gray-600 mb-2 text-sm sm:text-base">En attente des autres joueurs...</p>
                             ${waitingPlayers.length ? `<p class="text-xs sm:text-sm text-gray-500">Attente de : ${escapeHtml(waitingPlayerNames)}</p>` : ''}
                         </div>`

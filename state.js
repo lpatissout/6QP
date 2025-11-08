@@ -19,7 +19,8 @@ const state = {
     animationSpeed: 800,
     revealedCards: null,
     animationsDisabledReason: null,
-    isSpectator: false
+    isSpectator: false,
+    isProcessingChoice: false // ✅ NOUVEAU : Protection contre double-clic
 };
 
 /* ==================== PUR HELPERS ==================== */
@@ -105,4 +106,3 @@ function setGameSafe(newGame) {
 // Exemple d'utilisation à chaque réception/initialisation de partie
 // Remplace : state.game = dataFromFirebase;
 // Par : setGameSafe(dataFromFirebase);
-

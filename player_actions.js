@@ -1,8 +1,13 @@
 /* ==================== PLAYER ACTIONS - IMPROVED ==================== */
 
-// ✅ AMÉLIORATION : Gestionnaire d'animation qui utilise l'ID unique
+// ✅ AMÉLIORATION : Gestionnaire d'animation avec dédoublonnage
 const handleAnimation = (anim) => {
     const animationId = anim.uniqueId || `${anim.timestamp}-${anim.type}`;
+    
+    // ✅ Ignorer si déjà traitée (protection contre doublons Firebase)
+    if (playedAnimations.has(animationId)) {
+        return;
+    }
     
     debugLog('Received animation', { 
         type: anim.type, 
@@ -315,8 +320,14 @@ const analyzeRowChoice = (rowIndex, playerCard) => {
     };
 };
 
-// ✅ CORRECTION MAJEURE : Reprendre avec les cartes SUIVANTES, pas toutes
+// ✅ CORRECTION MAJEURE : Protection contre double-clic + Seulement l'hôte reprend
 const chooseRow = async (rowIndex) => {
+    // ✅ Protection contre double-clic
+    if (state.isProcessingChoice) {
+        debugLog('Choice already being processed, ignoring');
+        return;
+    }
+    
     debugLog('chooseRow called', { rowIndex, playerId: state.playerId });
     
     const game = await loadGame(state.gameCode);
@@ -330,9 +341,12 @@ const chooseRow = async (rowIndex) => {
         debugLog('Not authorized to choose row', { allowed: game.waitingForRowChoice });
         return;
     }
+    
+    // ✅ Bloquer les clics multiples
+    state.isProcessingChoice = true;
 
     const p = game.players.find(x => x.id === state.playerId);
-    const cardBeingPlaced = game.pendingCard; // ✅ Sauvegarder la carte
+    const cardBeingPlaced = game.pendingCard;
     const penaltyRow = [...game.rows[rowIndex]];
     const penaltyPoints = calculatePenaltyPoints(penaltyRow);
     p.score += penaltyPoints;
@@ -371,7 +385,7 @@ const chooseRow = async (rowIndex) => {
             playerName: p.name,
             penaltyPoints
         });
-        await new Promise(r => setTimeout(r, 3500)); // Temps complet de l'animation
+        await new Promise(r => setTimeout(r, 3500));
     }
 
     // ✅ IMPORTANT : Placer la carte sur la rangée maintenant vide
@@ -385,6 +399,9 @@ const chooseRow = async (rowIndex) => {
     // ✅ Sauvegarder l'état avec la nouvelle rangée
     await saveGame(game);
     
+    // ✅ Débloquer les clics
+    state.isProcessingChoice = false;
+    
     // ✅ Petit délai pour synchronisation
     await new Promise(r => setTimeout(r, 500));
 
@@ -396,9 +413,11 @@ const chooseRow = async (rowIndex) => {
         return;
     }
 
-    // ✅ CRUCIAL : Reprendre avec les cartes APRÈS celle qu'on vient de traiter
-    debugLog('Resuming resolveAllPlays after row choice', { startFromCard: cardBeingPlaced });
-    await resolveAllPlays(game, cardBeingPlaced); // ✅ Passer la carte comme point de reprise
+    // ✅ CRUCIAL : Seulement l'hôte reprend la résolution
+    if (state.playerId === state.game.hostId) {
+        debugLog('Resuming resolveAllPlays after row choice', { startFromCard: cardBeingPlaced });
+        await resolveAllPlays(game, cardBeingPlaced);
+    }
 };
 
 const restartGame = async () => {
@@ -443,6 +462,7 @@ const leaveGame = () => {
     state.isSpectator = false;
     state.revealedCards = null;
     state.animationsDisabledReason = null;
+    state.isProcessingChoice = false; // ✅ Reset du flag
     if (typeof render === 'function') render();
 };
 

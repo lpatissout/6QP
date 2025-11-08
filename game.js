@@ -57,7 +57,7 @@ const resolveTurn = async () => {
     await resolveAllPlays(game);
 };
 
-// ✅ CORRECTION : Gérer le cas où on doit reprendre après un choix de rangée
+// ✅ CORRECTION : Gérer le cas où on doit reprendre après un choix de rangée + SEULEMENT L'HÔTE
 const resolveAllPlays = async (game, startFromCard = null) => {
     const plays = game.players
         .filter(p => Number.isInteger(p.playedCard))
@@ -66,8 +66,15 @@ const resolveAllPlays = async (game, startFromCard = null) => {
 
     debugLog('resolveAllPlays', { 
         cards: plays.map(p => p.card),
-        startFromCard: startFromCard 
+        startFromCard: startFromCard,
+        isHost: state.playerId === state.game.hostId
     });
+    
+    // ✅ Seulement l'hôte exécute la logique de jeu
+    if (state.playerId !== state.game.hostId) {
+        debugLog('Not host - skipping resolveAllPlays execution');
+        return;
+    }
 
     // ✅ Si on reprend après un choix, sauter les cartes déjà traitées
     let startIndex = 0;
@@ -247,4 +254,3 @@ const initializeGameRound = (game) => {
 
     return game;
 };
-//ftg//
