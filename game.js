@@ -57,6 +57,7 @@ const resolveTurn = async () => {
     await resolveAllPlays(game);
 };
 
+// ✅ CORRECTION PRINCIPALE : Attendre la résolution des choix de rangées
 const resolveAllPlays = async (game) => {
     const plays = game.players
         .filter(p => Number.isInteger(p.playedCard))
@@ -70,15 +71,21 @@ const resolveAllPlays = async (game) => {
         const p = game.players.find(x => x.id === play.pid);
         const validRows = findValidRows(play.card, game.rows);
 
+        // ✅ Si pas de rangées valides, on STOP et on attend
         if (!validRows.length) {
-            // Le joueur doit choisir une rangée
             game.waitingForRowChoice = play.pid;
             game.pendingCard = play.card;
             game.turnResolved = false;
+            
+            // ✅ Animation d'attente
+            if (state.enableAnimations) {
+                await publishAnimation(state.gameCode, 'WAITING_FOR_CHOICE', { playerName: p.name });
+            }
+            
             await saveGame(game);
             
-            debugLog('Player must choose during resolve', { player: p.name, card: play.card });
-            return;
+            debugLog('Player must choose during resolve - STOPPING HERE', { player: p.name, card: play.card });
+            return; // ✅ IMPORTANT : On s'arrête ici !
         }
 
         const chosenRow = findBestRow(validRows);
@@ -138,6 +145,7 @@ const resolveAllPlays = async (game) => {
         }
     }
 
+    // ✅ Si on arrive ici, c'est que toutes les cartes ont été placées
     await advanceGamePhase(game);
 };
 
@@ -167,20 +175,14 @@ const advanceGamePhase = async (game) => {
             game.currentTurn = 1;
             debugLog('New round started', { round: game.round });
             
-            // ✅ CORRECTION : Marquer explicitement que la manche est en préparation
             game.roundJustStarted = true;
-            
-            // ✅ Sauvegarder AVANT l'animation pour que tous les clients aient les nouvelles données
             await saveGame(game);
-            
-            // Attendre un peu pour que tous les joueurs reçoivent la mise à jour
             await new Promise(r => setTimeout(r, 500));
             
-            // Animation de nouvelle manche pour TOUS les joueurs
             if (state.enableAnimations) {
                 await publishAnimation(state.gameCode, 'NEW_ROUND', { 
                     round: game.round,
-                    timestamp: Date.now() // Force la synchronisation
+                    timestamp: Date.now()
                 });
                 await new Promise(r => setTimeout(r, 2000));
             }
