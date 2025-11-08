@@ -235,7 +235,7 @@ const animateCardToRow = (data, callback) => {
             flyingCard.style.transform = 'scale(0.8)';
             setTimeout(() => {
                 flyingCard.remove();
-                if (typeof render === 'function') render();
+                // ✅ CORRECTION : Ne pas render pendant l'animation, attendre le callback
                 callback();
             }, 300);
         }, state.animationSpeed);

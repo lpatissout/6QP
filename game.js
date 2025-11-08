@@ -167,8 +167,10 @@ const advanceGamePhase = async (game) => {
             game.currentTurn = 1;
             debugLog('New round started', { round: game.round });
             
-            // CORRECTION ERREUR 1 : Réinitialiser les animations pour tous
+            // ✅ CORRECTION : Marquer explicitement que la manche est en préparation
             game.roundJustStarted = true;
+            
+            // ✅ Sauvegarder AVANT l'animation pour que tous les clients aient les nouvelles données
             await saveGame(game);
             
             // Attendre un peu pour que tous les joueurs reçoivent la mise à jour

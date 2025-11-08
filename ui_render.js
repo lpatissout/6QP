@@ -373,14 +373,14 @@ const renderGame = () => {
         `;
     }
     
-    // ✅ SÉCURITÉ : Vérifier que rows existe
+    // ✅ SÉCURITÉ : Vérifier que rows existe (peut être undefined pendant transition de manche)
     if (!state.game.rows || !Array.isArray(state.game.rows)) {
-        console.error('Game rows not properly initialized');
+        console.warn('Game rows not ready, waiting for round initialization');
         return `
             <div class="container mx-auto px-4 py-8">
                 <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
-                    <div class="text-xl text-red-600">❌ Erreur de chargement des rangées</div>
-                    <button onclick="leaveGame()" class="mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg">Quitter</button>
+                    <div class="text-xl mb-4">🎯 Préparation de la manche ${state.game.round || ''}...</div>
+                    <div class="text-gray-600">Distribution des cartes en cours</div>
                 </div>
             </div>
         `;
