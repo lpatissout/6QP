@@ -1,4 +1,4 @@
-/* ==================== FIREBASE OPERATIONS ==================== */
+/* ==================== FIREBASE OPERATIONS - IMPROVED ==================== */
 
 let gameRef = null;
 
@@ -36,8 +36,6 @@ const subscribeToGame = (code, onUpdate) => {
 
         debugLog('Firebase update received', { status: data.status });
         
-        // Si le joueur doit choisir une rangée, on efface les cartes révélées
-        // FIX: Ajout de la vérification state.playerId
         if (state.game && state.playerId && data.waitingForRowChoice === state.playerId && state.revealedCards) {
             state.revealedCards = null;
         }
@@ -45,7 +43,6 @@ const subscribeToGame = (code, onUpdate) => {
         const oldStatus = state.game ? state.game.status : null;
         state.game = data;
 
-        // Callback pour la logique métier
         if (onUpdate) {
             await onUpdate(data, oldStatus);
         }
@@ -59,27 +56,73 @@ const unsubscribeFromGame = () => {
     gameRef = null;
 };
 
+// ✅ AMÉLIORATION : Système d'animations avec ID unique
 const subscribeToAnimations = (code, onAnimation) => {
     if (!database) return;
     const animRef = database.ref('animations/' + code);
-    animRef.on('value', (snap) => {
+    
+    // ✅ Utiliser 'child_added' au lieu de 'value' pour ne recevoir que les nouvelles animations
+    animRef.on('child_added', (snap) => {
         const anim = snap.val();
-        if (anim && anim.timestamp > Date.now() - 5000) {
+        const animId = snap.key; // ✅ Utiliser la clé Firebase comme ID unique
+        
+        if (anim && anim.timestamp > Date.now() - 10000) { // Seulement les 10 dernières secondes
+            debugLog('New animation received', { type: anim.type, id: animId });
+            
             if (onAnimation) {
-                onAnimation(anim);
+                onAnimation({
+                    ...anim,
+                    uniqueId: animId // ✅ Ajouter l'ID unique
+                });
             }
         }
     });
+    
+    // ✅ Nettoyer les vieilles animations (> 30 secondes)
+    setInterval(() => {
+        cleanupOldAnimations(code);
+    }, 30000);
 };
 
+// ✅ Nettoyer les animations obsolètes
+const cleanupOldAnimations = async (code) => {
+    if (!database) return;
+    
+    const animRef = database.ref('animations/' + code);
+    const snap = await animRef.once('value');
+    const animations = snap.val();
+    
+    if (!animations) return;
+    
+    const now = Date.now();
+    const updates = {};
+    
+    Object.entries(animations).forEach(([key, anim]) => {
+        if (anim.timestamp < now - 30000) { // Plus de 30 secondes
+            updates[key] = null; // Marquer pour suppression
+        }
+    });
+    
+    if (Object.keys(updates).length > 0) {
+        await animRef.update(updates);
+        debugLog('Cleaned up old animations', { count: Object.keys(updates).length });
+    }
+};
+
+// ✅ AMÉLIORATION : Publier avec push() pour générer des IDs uniques
 const publishAnimation = async (code, animationType, data) => {
     if (!database || !state.enableAnimations) return;
     
-    await database.ref('animations/' + code).set({
+    const animRef = database.ref('animations/' + code);
+    
+    // ✅ Utiliser push() pour créer un ID unique automatiquement
+    await animRef.push({
         type: animationType,
         ...data,
         timestamp: Date.now()
     });
+    
+    debugLog('Animation published', { type: animationType });
 };
 
 const createGameData = (code, playerId, playerName) => {

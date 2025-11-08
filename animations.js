@@ -1,13 +1,23 @@
-/* ==================== ANIMATION SYSTEM ==================== */
+/* ==================== ANIMATION SYSTEM - IMPROVED ==================== */
 
-const queueAnimation = (type, data) => {
+// Historique des animations déjà jouées (évite les doublons)
+const playedAnimations = new Set();
+
+const queueAnimation = (type, data, animationId) => {
     if (!state.enableAnimations) {
         state.animationsDisabledReason = 'Animations désactivées par l\'utilisateur';
         debugLog('Animation skipped - disabled', { type });
         return;
     }
-    state.animationQueue.push({ type, data, id: Date.now() + Math.random() });
-    debugLog('Animation queued', { type, queueLength: state.animationQueue.length, enableAnimations: state.enableAnimations });
+    
+    // ✅ Vérifier si l'animation a déjà été jouée
+    if (animationId && playedAnimations.has(animationId)) {
+        debugLog('Animation already played, skipping', { type, animationId });
+        return;
+    }
+    
+    state.animationQueue.push({ type, data, id: animationId || (Date.now() + Math.random()) });
+    debugLog('Animation queued', { type, queueLength: state.animationQueue.length, animationId });
 };
 
 const processAnimationQueue = async () => {
@@ -22,6 +32,12 @@ const processAnimationQueue = async () => {
 
     while (state.animationQueue.length > 0) {
         const anim = state.animationQueue.shift();
+        
+        // ✅ Marquer comme jouée avant de jouer
+        if (anim.id) {
+            playedAnimations.add(anim.id);
+        }
+        
         await playAnimation(anim);
     }
 
@@ -29,9 +45,32 @@ const processAnimationQueue = async () => {
     debugLog('Animation queue completed');
 };
 
+// ✅ Nettoyer l'historique des animations anciennes (> 1 minute)
+const cleanupAnimationHistory = () => {
+    const oneMinuteAgo = Date.now() - 60000;
+    const toDelete = [];
+    
+    playedAnimations.forEach(id => {
+        // Format: timestamp-random ou juste timestamp
+        const timestamp = parseInt(id.toString().split('-')[0]);
+        if (timestamp < oneMinuteAgo) {
+            toDelete.push(id);
+        }
+    });
+    
+    toDelete.forEach(id => playedAnimations.delete(id));
+    
+    if (toDelete.length > 0) {
+        debugLog('Cleaned up old animations', { count: toDelete.length });
+    }
+};
+
+// ✅ Nettoyer toutes les minutes
+setInterval(cleanupAnimationHistory, 60000);
+
 const playAnimation = (anim) => {
     return new Promise((resolve) => {
-        debugLog('Playing animation', { type: anim.type });
+        debugLog('Playing animation', { type: anim.type, id: anim.id });
 
         switch (anim.type) {
             case 'REVEAL_CARDS':
@@ -198,7 +237,6 @@ const animate6thCardPenalty = (data, callback) => {
     
     debugLog('Animating 6th card penalty', { card, rowIndex, playerName, penaltyPoints });
     
-    // AMÉLIORATION: Explication claire
     showExplanationBanner(
         `⚠️ ${escapeHtml(playerName)} place la 6ème carte !`,
         `La carte ${card} force ${escapeHtml(playerName)} à ramasser les 5 cartes de la rangée ${rowIndex + 1}`,
@@ -276,7 +314,6 @@ const animate6thCardPenalty = (data, callback) => {
         }, 1000);
     }, 1200);
 
-    // CORRECTION ERREUR 2: Un seul popup de pénalité
     setTimeout(() => {
         const popup = document.createElement('div');
         popup.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white px-8 py-6 rounded-xl shadow-2xl z-[10001] font-bold text-lg bounce-in';
@@ -320,7 +357,6 @@ const animateWaitingForChoice = (data, callback) => {
 const animatePlayerChoseRow = (data, callback) => {
     const { card, rowIndex, playerName, penaltyPoints } = data;
     
-    // AMÉLIORATION: Explication du choix
     showExplanationBanner(
         `💡 ${escapeHtml(playerName)} choisit la rangée ${rowIndex + 1}`,
         `Carte trop petite (${card}) : ramasse ${penaltyPoints} points de pénalité`,
@@ -334,8 +370,6 @@ const animatePlayerChoseRow = (data, callback) => {
     
     if (typeof render === 'function') render();
     
-    // CORRECTION ERREUR 2: Ne pas afficher de popup ici (déjà dans animate6thCardPenalty)
-    // On fait juste le fade de l'overlay
     setTimeout(() => {
         const overlay = document.getElementById('reveal-overlay');
         if (overlay) {
@@ -353,7 +387,6 @@ const animatePlayerChoseRow = (data, callback) => {
     }, ANIMATION_CONSTANTS.PENALTY_DISPLAY_DURATION);
 };
 
-// NOUVEAU: Animation de nouvelle manche
 const animateNewRound = (data, callback) => {
     const { round } = data;
     

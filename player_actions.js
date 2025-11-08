@@ -1,4 +1,46 @@
-/* ==================== PLAYER ACTIONS ==================== */
+/* ==================== PLAYER ACTIONS - IMPROVED ==================== */
+
+// ✅ AMÉLIORATION : Gestionnaire d'animation qui utilise l'ID unique
+const handleAnimation = (anim) => {
+    // ✅ Utiliser l'ID unique de Firebase ou générer un ID basé sur le timestamp
+    const animationId = anim.uniqueId || `${anim.timestamp}-${anim.type}`;
+    
+    debugLog('Received animation', { 
+        type: anim.type, 
+        id: animationId,
+        timestamp: anim.timestamp 
+    });
+    
+    // ✅ Passer l'ID unique au système d'animations
+    queueAnimation(anim.type, anim, animationId);
+    processAnimationQueue();
+};
+
+// Gestionnaire de mise à jour du jeu
+const handleGameUpdate = async (data, oldStatus) => {
+    if (data.status === 'playing' && state.screen !== 'game') {
+        debugLog('Switching to game screen (Firebase status playing)');
+        state.screen = 'game';
+    }
+
+    // CORRECTION: Vérifier que l'hôte déclenche la résolution quand tous ont joué
+    if (
+        state.game.status === 'playing' &&
+        !state.game.turnResolved &&
+        oldStatus === 'playing' &&
+        state.playerId === state.game.hostId
+    ) {
+        const activePlayers = state.game.players.filter(p => !p.isSpectator);
+        const allPlayed = activePlayers.every(p => hasPlayed(p));
+        
+        if (allPlayed) {
+            debugLog('All players played -> resolveTurn (by host only)');
+            await resolveTurn();
+        }
+    }
+};
+
+/* Les autres fonctions restent identiques mais voici les versions complètes pour référence */
 
 const createGame = async () => {
     if (!state.playerName || !state.playerName.trim()) {
@@ -36,7 +78,7 @@ const createGame = async () => {
         turnResolved: false,
         waitingForRowChoice: null,
         pendingCard: null,
-        turnHistory: [] // NOUVEAU: Historique des actions
+        turnHistory: []
     };
 
     debugLog('Creating game', { code, host: state.playerName });
@@ -49,7 +91,6 @@ const createGame = async () => {
     if (typeof render === 'function') render();
 };
 
-// NOUVEAU: Rejoindre en spectateur
 const joinAsSpectator = async () => {
     if (!state.playerName || !state.playerName.trim() || !state.joinCode || !state.joinCode.trim()) {
         alert('Entrez pseudo et code !');
@@ -75,7 +116,7 @@ const joinAsSpectator = async () => {
         id: pid,
         name: state.playerName + ' 👁️',
         score: 0,
-        ready: true, // Les spectateurs sont toujours prêts
+        ready: true,
         hand: [],
         playedCard: null,
         isSpectator: true
@@ -161,7 +202,6 @@ const startGame = async () => {
         return;
     }
     
-    // Vérifier que tous les JOUEURS (pas spectateurs) sont prêts
     const activePlayers = state.game.players.filter(p => !p.isSpectator);
     if (!activePlayers.every(p => p.ready)) {
         alert('Tous les joueurs doivent être prêts !');
@@ -224,7 +264,7 @@ const playCard = async (card) => {
     p.hand = p.hand.filter(c => c !== card);
     state.selectedCard = null;
     
-    // NOUVEAU: Ajouter à l'historique
+    // ✅ Ajouter à l'historique (sera masqué jusqu'à ce que tous jouent)
     if (!state.game.turnHistory) state.game.turnHistory = [];
     state.game.turnHistory.push({
         turn: state.game.currentTurn,
@@ -240,12 +280,10 @@ const playCard = async (card) => {
     if (typeof render === 'function') render();
 };
 
-// NOUVEAU: Analyse stratégique pour le choix de rangée
 const analyzeRowChoice = (rowIndex, playerCard) => {
     const row = state.game.rows[rowIndex];
     const penaltyPoints = calculatePenaltyPoints(row);
     
-    // Analyser les cartes des autres joueurs
     const otherPlayers = state.game.players.filter(p => 
         !p.isSpectator && 
         p.id !== state.playerId && 
@@ -255,9 +293,7 @@ const analyzeRowChoice = (rowIndex, playerCard) => {
     let strategicAdvice = '';
     let potentialVictims = [];
     
-    // Vérifier si en choisissant cette rangée, on peut piéger un autre joueur
     otherPlayers.forEach(opponent => {
-        // Simuler : si on place notre carte ici, quelles cartes de l'adversaire pourraient tomber dedans ?
         const minOpponentCard = Math.min(...opponent.hand);
         const maxOpponentCard = Math.max(...opponent.hand);
         
@@ -302,7 +338,6 @@ const chooseRow = async (rowIndex) => {
     const penaltyPoints = calculatePenaltyPoints(penaltyRow);
     p.score += penaltyPoints;
     
-    // NOUVEAU: Ajouter à l'historique
     if (!game.turnHistory) game.turnHistory = [];
     game.turnHistory.push({
         turn: game.currentTurn,
@@ -322,7 +357,6 @@ const chooseRow = async (rowIndex) => {
         cards: penaltyRow
     });
 
-    // Animation de pénalité
     if (state.enableAnimations) {
         await publishAnimation(state.gameCode, 'PLAYER_CHOSE_ROW', {
             card: game.pendingCard,
@@ -337,7 +371,6 @@ const chooseRow = async (rowIndex) => {
     game.rows[rowIndex] = [game.pendingCard];
     p.playedCard = null;
 
-    // Vérifier si le joueur a atteint 66 points
     if (p.score >= GAME_CONSTANTS.SCORE_LIMIT) {
         game.status = 'finished';
         game.finishReason = 'score_limit';
@@ -346,7 +379,6 @@ const chooseRow = async (rowIndex) => {
         return;
     }
 
-    // Continuer la résolution des cartes restantes
     await resolveAllPlays(game);
 };
 
@@ -358,7 +390,6 @@ const restartGame = async () => {
 
     debugLog('Restarting game');
     
-    // Réinitialiser les scores (sauf spectateurs)
     state.game.players.forEach(p => {
         if (!p.isSpectator) {
             p.score = 0;
@@ -406,35 +437,4 @@ const copyLink = () => {
         state.copied = false;
         if (typeof render === 'function') render();
     }, 2000);
-};
-
-// Gestionnaire de mise à jour du jeu
-const handleGameUpdate = async (data, oldStatus) => {
-    if (data.status === 'playing' && state.screen !== 'game') {
-        debugLog('Switching to game screen (Firebase status playing)');
-        state.screen = 'game';
-    }
-
-    // CORRECTION: Vérifier que l'hôte déclenche la résolution quand tous ont joué
-    if (
-        state.game.status === 'playing' &&
-        !state.game.turnResolved &&
-        oldStatus === 'playing' &&
-        state.playerId === state.game.hostId
-    ) {
-        // Ne compter que les joueurs actifs (pas spectateurs)
-        const activePlayers = state.game.players.filter(p => !p.isSpectator);
-        const allPlayed = activePlayers.every(p => hasPlayed(p));
-        
-        if (allPlayed) {
-            debugLog('All players played -> resolveTurn (by host only)');
-            await resolveTurn();
-        }
-    }
-};
-
-// Gestionnaire d'animation
-const handleAnimation = (anim) => {
-    queueAnimation(anim.type, anim);
-    processAnimationQueue();
 };
