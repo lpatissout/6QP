@@ -1,9 +1,10 @@
 /* ==================== MAIN APP INITIALIZATION ==================== */
 
+// Gestionnaires d'événements UI
 window.handleCardClick = (card) => {
     const p = state.game?.players.find(x => x.id === state.playerId);
-    if (!p) {
-        console.warn('handleCardClick: player not found');
+    if (!p || p.isSpectator) {
+        console.warn('handleCardClick: player not found or is spectator');
         return;
     }
     if (hasPlayed(p)) {
@@ -45,7 +46,7 @@ window.toggleAnimations = () => {
     // Afficher un message de confirmation
     const msg = document.createElement('div');
     msg.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-3 rounded-lg shadow-lg z-[10000] font-semibold slide-up';
-    msg.textContent = state.enableAnimations ? '🎬 Animations activées' : '⭐️ Animations désactivées';
+    msg.textContent = state.enableAnimations ? '🎬 Animations activées' : '⏭️ Animations désactivées';
     document.body.appendChild(msg);
     
     setTimeout(() => {
@@ -65,6 +66,7 @@ window.clearDebugLogs = () => {
 // Exposition des fonctions globales
 window.createGame = createGame;
 window.joinGame = joinGame;
+window.joinAsSpectator = joinAsSpectator; // NOUVEAU
 window.toggleReady = toggleReady;
 window.startGame = startGame;
 window.playCard = playCard;
@@ -72,13 +74,20 @@ window.chooseRow = chooseRow;
 window.leaveGame = leaveGame;
 window.copyLink = copyLink;
 window.restartGame = restartGame;
+window.analyzeRowChoice = analyzeRowChoice; // NOUVEAU
 
-// Initialisation
+// Initialisation de l'application
 document.addEventListener('DOMContentLoaded', () => {
     debugLog('App initialized', { 
         isMobile: state.isMobile, 
         animationsEnabled: state.enableAnimations 
     });
+
+    // Vérifier que render est disponible
+    if (typeof render !== 'function') {
+        console.error('ERREUR: render() n\'est pas définie. Vérifiez l\'ordre de chargement des scripts.');
+        return;
+    }
 
     // Détection d'un lien d'invitation
     const urlParams = new URLSearchParams(window.location.search);
@@ -99,8 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
         state.invitePending = false;
     }
 
-    // Premier rendu
-    render();
+    // Premier rendu - avec un délai pour s'assurer que tout est chargé
+    setTimeout(() => {
+        render();
+    }, 100);
 
     // Détection du redimensionnement
     window.addEventListener('resize', () => {
@@ -115,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    console.log('✅ 6 qui prend! ready to play (with animations 🎬)');
+    console.log('✅ 6 qui prend! ready to play (with animations 🎬 and spectator mode 👁️)');
     
     // Liaison du bouton "Rejoindre la partie"
     document.addEventListener('click', (e) => {

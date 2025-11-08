@@ -126,10 +126,14 @@
     <!-- Overlay pour les cartes volantes -->
     <div id="flying-cards-overlay" class="flying-card-overlay"></div>
 
-    <!-- ORDRE CRITIQUE : Firebase -> game -> ui -> main -->
+    <!-- ORDRE CRITIQUE CORRIGÉ : charger dans le bon ordre -->
+    <script src="config.js"></script>
+    <script src="state.js"></script>
     <script src="firebase.js"></script>
     <script src="game.js"></script>
-    <script src="ui.js"></script>
+    <script src="animations.js"></script>
+    <script src="player_actions.js"></script>
+    <script src="ui_render.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

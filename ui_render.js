@@ -1,4 +1,4 @@
-/* ==================== UI RENDERING ==================== */
+/* ==================== UI RENDERING - IMPROVED & COMPLETE ==================== */
 
 /* ==================== Debug panel ==================== */
 
@@ -45,39 +45,127 @@ const renderCard = (num, selected = false, clickable = true, small = false) => {
     `;
 };
 
-/* ==================== Overlay de révélation des cartes ==================== */
+/* ==================== ✅ CORRECTION HISTORIQUE ==================== */
+
+const renderTurnHistory = () => {
+    if (!state.game.turnHistory || state.game.turnHistory.length === 0) return '';
+    
+    // Ne montrer que les actions COMPLÈTES (pas les cartes du tour en cours)
+    const activePlayers = state.game.players.filter(p => !p.isSpectator);
+    const allPlayersPlayed = activePlayers.every(p => hasPlayed(p));
+    
+    // L'historique montre SEULEMENT :
+    // 1. Les tours complètement résolus (tours précédents)
+    // 2. Les choix de rangées (qui sont des actions définitives)
+    const visibleActions = state.game.turnHistory.filter(action => {
+        // Toujours afficher les choix de rangées
+        if (action.action === 'chose_row') return true;
+        
+        // Pour les cartes jouées : seulement celles des tours précédents
+        if (action.action === 'played') {
+            return action.turn < state.game.currentTurn;
+        }
+        
+        return false;
+    });
+    
+    if (visibleActions.length === 0) {
+        return `
+        <div class="bg-gray-100 rounded-lg shadow-lg p-3 mb-2 sm:mb-4 text-center">
+            <h3 class="font-bold text-sm mb-2 text-gray-500">📜 Historique</h3>
+            <div class="text-xs text-gray-400 italic">
+                Aucune action pour le moment
+            </div>
+        </div>
+        `;
+    }
+    
+    const recentActions = visibleActions.slice(-5).reverse();
+    
+    return `
+    <div class="bg-white rounded-lg shadow-lg p-3 mb-2 sm:mb-4">
+        <h3 class="font-bold text-sm mb-2">📜 Historique récent</h3>
+        <div class="space-y-1 text-xs">
+            ${recentActions.map(action => {
+                if (action.action === 'played') {
+                    return `<div class="text-gray-700">🎴 <strong>Tour ${action.turn}</strong> : ${escapeHtml(action.player)} a joué le ${action.card}</div>`;
+                } else if (action.action === 'chose_row') {
+                    return `<div class="text-orange-700 font-semibold">⚠️ ${escapeHtml(action.player)} a ramassé R${action.rowIndex + 1} (+${action.penaltyPoints}🐮)</div>`;
+                }
+                return '';
+            }).join('')}
+        </div>
+    </div>
+    `;
+};
+
+/* ==================== Indicateurs visuels améliorés ==================== */
+
+const renderPlayerStatus = (player, isMe = false) => {
+    const hasPlayedCard = hasPlayed(player);
+    
+    let statusIcon = '';
+    let statusText = '';
+    let statusClass = '';
+    
+    if (hasPlayedCard) {
+        statusIcon = '✅';
+        statusText = 'A joué';
+        statusClass = 'text-green-600 font-semibold';
+    } else if (player.isSpectator) {
+        statusIcon = '👁️';
+        statusText = 'Spectateur';
+        statusClass = 'text-purple-500';
+    } else {
+        statusIcon = '⏳';
+        statusText = 'Réfléchit...';
+        statusClass = 'text-orange-500 animate-pulse';
+    }
+    
+    return `
+        <div class="text-center p-2 sm:p-3 rounded-lg ${isMe ? 'bg-orange-100 ring-2 ring-orange-500' : hasPlayedCard ? 'bg-green-50' : 'bg-gray-100'}">
+            <div class="font-semibold truncate text-xs sm:text-base">${escapeHtml(player.name)}</div>
+            <div class="text-2xl sm:text-3xl font-bold">${player.score} 🐮</div>
+            <div class="${statusClass} text-xs sm:text-sm flex items-center justify-center gap-1">
+                <span>${statusIcon}</span>
+                <span>${statusText}</span>
+            </div>
+        </div>
+    `;
+};
+
+/* ==================== Overlay de révélation amélioré ==================== */
 
 const renderRevealOverlay = () => {
     if (!state.revealedCards || state.revealedCards.length === 0) return '';
     
     const isWaitingForMyChoice = state.game.waitingForRowChoice === state.playerId;
     
-    // Si c'est à moi de choisir, on n'affiche PAS l'overlay
     if (isWaitingForMyChoice) return '';
     
     return `
     <div id="reveal-overlay" class="fixed inset-0 bg-black bg-opacity-70 z-[10000] flex items-center justify-center transition-opacity duration-500" style="opacity: 1;">
-        <div class="text-center">
-            <h2 class="text-white text-3xl font-bold mb-8 animate-pulse">
+        <div class="text-center max-w-4xl mx-auto px-4">
+            <h2 class="text-white text-2xl sm:text-3xl font-bold mb-6 sm:mb-8 animate-pulse">
                 🎴 Cartes jouées ce tour
             </h2>
-            <div class="flex gap-6 justify-center items-end flex-wrap">
+            <div class="flex gap-3 sm:gap-6 justify-center items-end flex-wrap">
                 ${state.revealedCards.map(play => {
                     const heads = calculateHeads(play.card);
                     const color = getCardColor(play.card);
                     return `
                     <div class="text-center transform transition-all duration-300 hover:scale-105" data-revealed-card="${play.card}">
-                        <div class="${color} text-white rounded-lg shadow-2xl flex flex-col items-center justify-between p-3 font-bold w-24 h-32 mb-2 bounce-in">
-                            <span class="text-3xl">${play.card}</span>
-                            <div class="text-2xl">${'🐮'.repeat(heads)}</div>
+                        <div class="${color} text-white rounded-lg shadow-2xl flex flex-col items-center justify-between p-2 sm:p-3 font-bold w-20 h-28 sm:w-24 sm:h-32 mb-2 bounce-in">
+                            <span class="text-2xl sm:text-3xl">${play.card}</span>
+                            <div class="text-lg sm:text-2xl">${'🐮'.repeat(heads)}</div>
                         </div>
-                        <div class="text-white font-semibold text-lg">${escapeHtml(play.name)}</div>
+                        <div class="text-white font-semibold text-sm sm:text-lg">${escapeHtml(play.name)}</div>
                     </div>
                     `;
                 }).join('')}
             </div>
             ${state.game.waitingForRowChoice ? 
-                `<p class="text-white text-xl mt-8 animate-pulse">⏳ En attente de ${escapeHtml(state.game.players.find(p => p.id === state.game.waitingForRowChoice)?.name || 'un joueur')}...</p>` 
+                `<p class="text-white text-lg sm:text-xl mt-6 sm:mt-8 animate-pulse">⏳ En attente de ${escapeHtml(state.game.players.find(p => p.id === state.game.waitingForRowChoice)?.name || 'un joueur')}...</p>` 
                 : ''
             }
         </div>
@@ -160,14 +248,21 @@ const renderJoin = () => `
                     maxlength="6"
                     ${state.invitePending ? 'readonly' : ''}
                 />
-                ${state.invitePending ? '<div class="text-sm text-gray-500 mt-2">Vous avez été invité – vérifiez votre pseudo puis cliquez sur Rejoindre.</div>' : ''}
+                ${state.invitePending ? '<div class="text-sm text-gray-500 mt-2">Vous avez été invité — vérifiez votre pseudo puis cliquez sur Rejoindre.</div>' : ''}
             </div>
 
             <button
                 id="join-btn"
                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg mb-3 transition"
             >
-                🎮 Rejoindre la partie
+                🎮 Rejoindre comme joueur
+            </button>
+            
+            <button
+                onclick="joinAsSpectator()"
+                class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 rounded-lg mb-3 transition"
+            >
+                👁️ Rejoindre comme spectateur
             </button>
 
             <button
@@ -176,6 +271,10 @@ const renderJoin = () => `
             >
                 Retour
             </button>
+            
+            <div class="mt-4 bg-purple-50 p-3 rounded-lg text-xs text-gray-700">
+                <strong>Mode spectateur :</strong> Vous pourrez observer la partie et voir toutes les animations, mais ne recevrez pas de cartes.
+            </div>
         </div>
 
         <div class="mt-4 max-w-md mx-auto">
@@ -186,8 +285,10 @@ const renderJoin = () => `
 
 const renderLobby = () => {
     const isHost = state.game.hostId === state.playerId;
-    const me = state.game.players.find(p => p.id === state.playerId) || { ready: false };
-    const canStart = isHost && state.game.players.length >= 2 && state.game.players.every(p => p.ready);
+    const me = state.game.players.find(p => p.id === state.playerId) || { ready: false, isSpectator: false };
+    const activePlayers = state.game.players.filter(p => !p.isSpectator);
+    const spectators = state.game.players.filter(p => p.isSpectator);
+    const canStart = isHost && activePlayers.length >= 2 && activePlayers.every(p => p.ready);
 
     return `
     <div class="container mx-auto px-4 py-8">
@@ -209,14 +310,15 @@ const renderLobby = () => {
                         <div class="text-2xl font-bold">${escapeHtml(state.gameCode)}</div>
                     </div>
                     <div class="text-right">
-                        <small class="text-gray-500">Joueurs</small>
-                        <div class="text-2xl font-bold">${state.game.players.length}</div>
+                        <small class="text-gray-500">Joueurs actifs</small>
+                        <div class="text-2xl font-bold">${activePlayers.length}</div>
                     </div>
                 </div>
             </div>
 
+            <h3 class="font-bold mb-3">🎮 Joueurs</h3>
             <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-                ${state.game.players.map(p => `
+                ${activePlayers.map(p => `
                     <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center ${p.id === state.playerId ? 'ring-2 ring-orange-500' : ''}">
                         <div>
                             <div class="font-semibold text-lg">${escapeHtml(p.name)}</div>
@@ -226,12 +328,26 @@ const renderLobby = () => {
                     </div>
                 `).join('')}
             </div>
+            
+            ${spectators.length > 0 ? `
+                <h3 class="font-bold mb-3">👁️ Spectateurs (${spectators.length})</h3>
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${spectators.map(p => `
+                        <div class="bg-purple-50 p-3 rounded-lg flex justify-between items-center ${p.id === state.playerId ? 'ring-2 ring-purple-500' : ''}">
+                            <div class="font-semibold">${escapeHtml(p.name)}</div>
+                            <div class="text-2xl">👁️</div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
 
             <div class="flex gap-3">
-                <button onclick="toggleReady()" class="flex-1 ${me.ready ? 'bg-gray-300 hover:bg-gray-400' : 'bg-green-500 hover:bg-green-600 text-white'} font-bold py-3 rounded-lg transition">
-                    ${me.ready ? 'Pas prêt' : 'Je suis prêt !'}
-                </button>
-                ${isHost ? `<button onclick="startGame()" class="flex-1 ${canStart ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-gray-300 text-gray-600 cursor-not-allowed'} font-bold py-3 rounded-lg transition" ${!canStart ? 'disabled' : ''}>🚀 Lancer la partie</button>` : ''}
+                ${!me.isSpectator ? `
+                    <button onclick="toggleReady()" class="flex-1 ${me.ready ? 'bg-gray-300 hover:bg-gray-400' : 'bg-green-500 hover:bg-green-600 text-white'} font-bold py-3 rounded-lg transition">
+                        ${me.ready ? 'Pas prêt' : 'Je suis prêt !'}
+                    </button>
+                ` : '<div class="flex-1 bg-purple-100 p-3 rounded-lg text-center text-gray-600">En attente du lancement...</div>'}
+                ${isHost && !me.isSpectator ? `<button onclick="startGame()" class="flex-1 ${canStart ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-gray-300 text-gray-600 cursor-not-allowed'} font-bold py-3 rounded-lg transition" ${!canStart ? 'disabled' : ''}>🚀 Lancer la partie</button>` : ''}
             </div>
 
             ${isHost && !canStart ? '<p class="text-sm text-red-500 mt-3 text-center">Tous les joueurs doivent être prêts (minimum 2 joueurs)</p>' : ''}
@@ -244,13 +360,42 @@ const renderLobby = () => {
     `;
 };
 
+// ✅ CORRECTION CRASH : Vérifications de sécurité renforcées
 const renderGame = () => {
+    // ✅ SÉCURITÉ : Vérifier que le jeu est chargé
+    if (!state.game || !state.game.players || !Array.isArray(state.game.players)) {
+        return `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <div class="text-xl">⏳ Chargement de la partie...</div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ✅ SÉCURITÉ : Vérifier que rows existe (peut être undefined pendant transition de manche)
+    if (!state.game.rows || !Array.isArray(state.game.rows)) {
+        console.warn('Game rows not ready, waiting for round initialization');
+        return `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <div class="text-xl mb-4">🎯 Préparation de la manche ${state.game.round || ''}...</div>
+                    <div class="text-gray-600">Distribution des cartes en cours</div>
+                </div>
+            </div>
+        `;
+    }
+    
     const me = state.game.players.find(p => p.id === state.playerId);
-    const waitingPlayers = state.game.players.filter(p => !hasPlayed(p)).map(p => p.name);
+    const activePlayers = state.game.players.filter(p => !p.isSpectator);
+    const waitingPlayers = activePlayers.filter(p => !hasPlayed(p));
     const isHost = state.game.hostId === state.playerId;
+    const isSpectator = me && me.isSpectator;
+    
+    const waitingPlayerNames = waitingPlayers.map(p => p.name).join(', ');
 
     if (state.game.status === 'finished') {
-        const winner = state.game.players.reduce((min, p) => p.score < min.score ? p : min);
+        const winner = activePlayers.reduce((min, p) => p.score < min.score ? p : min);
         const finishMessage = state.game.finishReason === 'score_limit' 
             ? `🎯 ${escapeHtml(winner.name)} a atteint 66 points !`
             : `🏁 Fin des ${state.game.maxRounds} manches !`;
@@ -262,7 +407,7 @@ const renderGame = () => {
                 <p class="text-lg text-gray-600 mb-4">${finishMessage}</p>
                 <h2 class="text-2xl mb-6">🏆 ${escapeHtml(winner.name)} gagne avec ${winner.score} points !</h2>
                 <div class="space-y-2 mb-6">
-                    ${state.game.players.sort((a,b)=>a.score-b.score).map((p,i)=>`
+                    ${activePlayers.sort((a,b)=>a.score-b.score).map((p,i)=>`
                         <div class="bg-gray-100 p-4 rounded-lg flex justify-between items-center">
                             <div class="flex items-center gap-3"><span class="text-2xl">${i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : `${i+1}.`}</span><span class="font-bold">${escapeHtml(p.name)}</span></div>
                             <span class="font-bold text-xl">${p.score} 🐮</span>
@@ -270,7 +415,7 @@ const renderGame = () => {
                     `).join('')}
                 </div>
                 <div class="flex gap-3 justify-center">
-                    ${isHost ? `<button onclick="restartGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-3 rounded-lg">🔄 Rejouer</button>` : ''}
+                    ${isHost && !isSpectator ? `<button onclick="restartGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-3 rounded-lg">🔄 Rejouer</button>` : ''}
                     <button onclick="leaveGame()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-lg">🏠 Retour à l'accueil</button>
                 </div>
                 ${!isHost ? '<p class="text-sm text-gray-500 mt-4">En attente que l\'hôte relance la partie...</p>' : ''}
@@ -285,36 +430,44 @@ const renderGame = () => {
     
     <div class="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
         <div class="max-w-6xl mx-auto">
-            <!-- En-tête responsive -->
             <div class="bg-white rounded-lg shadow-lg p-3 sm:p-4 mb-2 sm:mb-4">
                 <div class="flex flex-col sm:flex-row justify-between items-center gap-2">
                     <div class="text-center sm:text-left">
-                        <h2 class="text-lg sm:text-xl font-bold text-orange-600">Manche ${state.game.round}/${state.game.maxRounds} - Tour ${state.game.currentTurn}/10</h2>
+                        <h2 class="text-lg sm:text-xl font-bold text-orange-600">
+                            Manche ${state.game.round}/${state.game.maxRounds} - Tour ${state.game.currentTurn}/10
+                            ${isSpectator ? ' 👁️ <span class="text-sm text-purple-600">(Spectateur)</span>' : ''}
+                        </h2>
                         <p class="text-xs sm:text-sm text-gray-600">Code: ${escapeHtml(state.gameCode)}</p>
+                        ${waitingPlayers.length > 0 && !isSpectator ? 
+                            `<p class="text-xs text-orange-600 mt-1">⏳ En attente de: ${escapeHtml(waitingPlayerNames)}</p>` 
+                            : ''
+                        }
                     </div>
-                    <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition text-sm">Quitter</button>
+                    <div class="flex gap-2">
+                        <button onclick="toggleAnimations()" class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg transition text-sm" title="Activer/Désactiver les animations">
+                            ${state.enableAnimations ? '🎬' : '⏸️'}
+                        </button>
+                        <button onclick="leaveGame()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition text-sm">Quitter</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Scores joueurs responsive -->
             <div class="bg-white rounded-lg shadow-lg p-3 sm:p-4 mb-2 sm:mb-4">
-                <div class="grid grid-cols-2 sm:grid-cols-${Math.min(state.game.players.length,4)} gap-2 sm:gap-3">
-                    ${state.game.players.map(p => `
-                        <div class="text-center p-2 sm:p-3 rounded-lg ${p.id === state.playerId ? 'bg-orange-100 ring-2 ring-orange-500' : 'bg-gray-100'}">
-                            <div class="font-semibold truncate text-xs sm:text-base">${escapeHtml(p.name)}</div>
-                            <div class="text-2xl sm:text-3xl font-bold">${p.score} 🐮</div>
-                            ${hasPlayed(p) ? '<div class="text-green-500 text-xs sm:text-sm font-semibold">✓ Joué</div>' : '<div class="text-gray-400 text-xs sm:text-sm">En attente...</div>'}
-                        </div>
-                    `).join('')}
+                <div class="grid grid-cols-2 sm:grid-cols-${Math.min(activePlayers.length,4)} gap-2 sm:gap-3">
+                    ${activePlayers.map(p => renderPlayerStatus(p, p.id === state.playerId)).join('')}
                 </div>
             </div>
 
-            <!-- Rangées responsive -->
+            ${renderTurnHistory()}
+
             <div class="bg-white rounded-lg shadow-lg p-3 sm:p-6 mb-2 sm:mb-4">
                 <h3 class="font-bold mb-3 sm:mb-4 text-base sm:text-lg">Rangées de cartes :</h3>
 
                 ${state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId
-                    ? `<div class="bg-orange-100 border-2 border-orange-500 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 text-center font-bold text-orange-700 animate-pulse text-sm sm:text-base">⚠️ Votre carte (${state.game.pendingCard}) est trop petite ! Choisissez une rangée à ramasser :</div>`
+                    ? `<div class="bg-orange-100 border-2 border-orange-500 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 text-center font-bold text-orange-700 animate-pulse text-sm sm:text-base">
+                        ⚠️ Votre carte (${state.game.pendingCard}) est trop petite ! Choisissez une rangée à ramasser :
+                        <div class="text-xs mt-2 text-orange-600">💡 Astuce : Choisissez la rangée avec le moins de points, ou celle qui pourrait piéger un adversaire</div>
+                    </div>`
                     : state.game.waitingForRowChoice ? `<div class="bg-blue-100 border-2 border-blue-500 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 text-center font-bold text-blue-700 text-sm sm:text-base">⏳ ${escapeHtml(state.game.players.find(p=>p.id===state.game.waitingForRowChoice)?.name||'Un joueur')} doit choisir une rangée...</div>` : ''
                 }
 
@@ -322,27 +475,62 @@ const renderGame = () => {
                     ${state.game.rows.map((row,i)=> {
                         const totalHeads = row.reduce((s,c)=>s+calculateHeads(c),0);
                         const canClick = state.game.waitingForRowChoice && state.game.waitingForRowChoice === state.playerId;
+                        
+                        let strategicInfo = '';
+                        if (canClick) {
+                            const analysis = analyzeRowChoice(i, state.game.pendingCard);
+                            const isMinimum = state.game.rows.every((r, idx) => {
+                                const otherPoints = r.reduce((s,c)=>s+calculateHeads(c),0);
+                                return idx === i || totalHeads <= otherPoints;
+                            });
+                            
+                            strategicInfo = `
+                                <div class="text-xs mt-1 ${isMinimum ? 'text-green-700 font-semibold' : 'text-gray-600'}">
+                                    ${isMinimum ? '✅ Meilleur choix (min. points)' : ''}
+                                    ${analysis.strategicAdvice ? `<br>🎯 ${analysis.strategicAdvice}` : ''}
+                                </div>
+                            `;
+                        }
+                        
                         return `
                         <div id="row-${i}" class="flex items-center gap-2 sm:gap-3 p-2 rounded-lg ${canClick ? 'cursor-pointer hover:bg-orange-50 border-2 border-transparent hover:border-orange-500 transition pulse-animation' : 'border border-gray-200'}" ${canClick ? `onclick="chooseRow(${i})"` : ''}>
                             <span class="font-bold text-gray-700 text-xs sm:text-base min-w-[40px] sm:min-w-[50px]">R${i+1}</span>
                             <div class="flex gap-1 flex-wrap flex-1">
                                 ${row.map(c=> renderCard(c, false, false, true)).join('')}
                             </div>
-                            <span class="text-xs sm:text-sm font-semibold text-gray-700 bg-gray-100 px-2 py-1 sm:px-3 sm:py-2 rounded-lg whitespace-nowrap">${row.length}/5 | ${totalHeads}🐮</span>
+                            <div class="text-right">
+                                <span class="text-xs sm:text-sm font-semibold text-gray-700 bg-gray-100 px-2 py-1 sm:px-3 sm:py-2 rounded-lg whitespace-nowrap">${row.length}/5 | ${totalHeads}🐮</span>
+                                ${strategicInfo}
+                            </div>
                         </div>
                         `;
                     }).join('')}
                 </div>
             </div>
 
-            <!-- Main du joueur responsive -->
-            <div class="bg-white rounded-lg shadow-lg p-3 sm:p-6">
-                <h3 class="font-bold mb-3 sm:mb-4 text-base sm:text-lg">Votre main :</h3>
-                ${hasPlayed(me)
-                    ? `<div class="text-center py-4 sm:py-8"><p class="text-xl sm:text-2xl mb-2">✓ Vous avez joué votre carte !</p><p class="text-gray-600 mb-2 text-sm sm:text-base">En attente des autres joueurs...</p>${waitingPlayers.length ? `<p class="text-xs sm:text-sm text-gray-500">Attente de : ${escapeHtml(waitingPlayers.join(', '))}</p>` : ''}</div>`
-                    : `<div class="flex gap-2 flex-wrap justify-center mb-3 sm:mb-4">${me.hand.map(c => renderCard(c, state.selectedCard === c, true, false)).join('')}</div><p class="text-center text-xs sm:text-sm text-gray-600">${state.selectedCard ? '👆 Cliquez à nouveau sur la carte pour confirmer' : '👇 Choisissez une carte à jouer'}</p>`
-                }
-            </div>
+            ${isSpectator ? `
+                <div class="bg-purple-50 rounded-lg shadow-lg p-3 sm:p-6 text-center">
+                    <h3 class="font-bold mb-2 text-base sm:text-lg">👁️ Mode spectateur</h3>
+                    <p class="text-sm text-gray-600">Vous observez la partie. Profitez du spectacle ! 🍿</p>
+                </div>
+            ` : `
+                <div class="bg-white rounded-lg shadow-lg p-3 sm:p-6">
+                    <h3 class="font-bold mb-3 sm:mb-4 text-base sm:text-lg">Votre main :</h3>
+                    ${hasPlayed(me)
+                        ? `<div class="text-center py-4 sm:py-8">
+                            <p class="text-xl sm:text-2xl mb-2">✓ Vous avez joué votre carte !</p>
+                            <p class="text-gray-600 mb-2 text-sm sm:text-base">En attente des autres joueurs...</p>
+                            ${waitingPlayers.length ? `<p class="text-xs sm:text-sm text-gray-500">Attente de : ${escapeHtml(waitingPlayerNames)}</p>` : ''}
+                        </div>`
+                        : `<div class="flex gap-2 flex-wrap justify-center mb-3 sm:mb-4">
+                            ${me.hand.map(c => renderCard(c, state.selectedCard === c, true, false)).join('')}
+                        </div>
+                        <p class="text-center text-xs sm:text-sm text-gray-600">
+                            ${state.selectedCard ? '👆 Cliquez à nouveau sur la carte pour confirmer' : '👇 Choisissez une carte à jouer'}
+                        </p>`
+                    }
+                </div>
+            `}
         </div>
 
         ${!state.isMobile ? `<div class="mt-4 max-w-6xl mx-auto">${renderDebugPanel()}</div>` : ''}
