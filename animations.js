@@ -103,18 +103,28 @@ const playAnimation = (anim) => {
 
 /* ==================== HELPER: BANNIÈRES EXPLICATIVES ==================== */
 
+// ✅ CORRECTION : Supprimer les translations qui causent le dédoublement
 const showExplanationBanner = (title, message, bgColor = 'bg-blue-500', duration = 2000) => {
     const banner = document.createElement('div');
-    banner.className = `fixed top-20 left-1/2 transform -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-xl z-[10002] max-w-md slide-up`;
+    banner.className = `fixed top-20 left-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-xl z-[10002] max-w-md`;
+    banner.style.cssText = `
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    `;
     banner.innerHTML = `
         <div class="font-bold text-lg mb-1">${title}</div>
         <div class="text-sm opacity-90">${message}</div>
     `;
     document.body.appendChild(banner);
     
+    // Fade in
+    requestAnimationFrame(() => {
+        banner.style.opacity = '1';
+    });
+    
     setTimeout(() => {
         banner.style.opacity = '0';
-        banner.style.transform = 'translate(-50%, -20px)';
         setTimeout(() => banner.remove(), 300);
     }, duration);
 };
@@ -232,6 +242,7 @@ const animateCardToRow = (data, callback) => {
     }, 300);
 };
 
+// ✅ CORRECTION MAJEURE : Animation 6ème carte améliorée
 const animate6thCardPenalty = (data, callback) => {
     const { card, rowIndex, playerName, penaltyPoints } = data;
     
@@ -250,90 +261,101 @@ const animate6thCardPenalty = (data, callback) => {
         return;
     }
 
-    const cards = targetRow.querySelectorAll('div[class*="w-12"]');
     const overlay = document.getElementById('flying-cards-overlay');
+    const color = getCardColor(card);
 
-    // Animation des cartes qui partent
-    cards.forEach((cardEl, i) => {
-        const clone = cardEl.cloneNode(true);
-        const cardRect = cardEl.getBoundingClientRect();
-        clone.style.cssText = `
-            position: fixed;
-            left: ${cardRect.left}px;
-            top: ${cardRect.top}px;
-            width: ${cardRect.width}px;
-            height: ${cardRect.height}px;
-            z-index: 9998;
-            transition: all 600ms ease-in-out;
-        `;
-        overlay.appendChild(clone);
-
-        setTimeout(() => {
-            const rowRect = targetRow.getBoundingClientRect();
-            clone.style.left = (rowRect.left + 80) + 'px';
-            clone.style.transform = `translateX(${i * 5}px)`;
-        }, 100);
-
-        setTimeout(() => {
-            clone.style.opacity = '0';
-            clone.style.transform = `translateX(${i * 5}px) scale(0.5)`;
-        }, 800);
-
-        setTimeout(() => clone.remove(), 1400);
-    });
-
-    // Ajouter la nouvelle carte qui prend la place
+    // 1. Faire apparaître la 6ème carte à sa position finale
+    const rowRect = targetRow.getBoundingClientRect();
+    const sixthCard = document.createElement('div');
+    sixthCard.className = `${color} text-white rounded-lg shadow-2xl flex flex-col items-center justify-center font-bold`;
+    sixthCard.style.cssText = `
+        position: fixed;
+        left: ${window.innerWidth / 2 - 24}px;
+        top: ${window.innerHeight / 2 - 32}px;
+        width: 48px;
+        height: 64px;
+        z-index: 10000;
+        opacity: 0;
+        transform: scale(1.5);
+        transition: all 600ms ease-out;
+    `;
+    sixthCard.innerHTML = `<span class="text-2xl">${card}</span>`;
+    overlay.appendChild(sixthCard);
+    
+    // 2. Animation d'apparition de la 6ème carte
     setTimeout(() => {
-        const color = getCardColor(card);
-        const newCard = document.createElement('div');
-        const rowRect = targetRow.getBoundingClientRect();
-        
-        newCard.className = `${color} text-white rounded-lg shadow-2xl flex flex-col items-center justify-center font-bold`;
-        newCard.style.cssText = `
-            position: fixed;
-            left: ${rowRect.left + 100}px;
-            top: ${rowRect.top + 10}px;
-            width: 48px;
-            height: 64px;
-            z-index: 9999;
-            opacity: 0;
-            transform: scale(1.5);
-            transition: all 600ms ease-out;
-        `;
-        newCard.innerHTML = `<span class="text-2xl">${card}</span>`;
-        overlay.appendChild(newCard);
-        
-        requestAnimationFrame(() => {
-            newCard.style.opacity = '1';
-            newCard.style.transform = 'scale(1)';
-        });
-        
-        setTimeout(() => {
-            newCard.style.opacity = '0';
-            setTimeout(() => newCard.remove(), 300);
-        }, 1000);
-    }, 1200);
+        const cards = targetRow.querySelectorAll('div[class*="w-12"]');
+        const lastCardRect = cards[cards.length - 1].getBoundingClientRect();
+        sixthCard.style.left = (lastCardRect.right + 2) + 'px';
+        sixthCard.style.top = lastCardRect.top + 'px';
+        sixthCard.style.opacity = '1';
+        sixthCard.style.transform = 'scale(1)';
+    }, 100);
 
+    // 3. Pause pour montrer la 6ème carte en place (1 seconde)
     setTimeout(() => {
-        const popup = document.createElement('div');
-        popup.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white px-8 py-6 rounded-xl shadow-2xl z-[10001] font-bold text-lg bounce-in';
-        popup.innerHTML = `
-            <div class="text-center">
-                <div class="text-3xl mb-2">⚠️ ${escapeHtml(playerName)} ramasse !</div>
-                <div class="text-4xl mt-3 font-black">+${penaltyPoints} 🐮</div>
-            </div>
-        `;
-        document.body.appendChild(popup);
+        // 4. Faire disparaître les 5 premières cartes
+        const cards = targetRow.querySelectorAll('div[class*="w-12"]');
+        cards.forEach((cardEl, i) => {
+            const clone = cardEl.cloneNode(true);
+            const cardRect = cardEl.getBoundingClientRect();
+            clone.style.cssText = `
+                position: fixed;
+                left: ${cardRect.left}px;
+                top: ${cardRect.top}px;
+                width: ${cardRect.width}px;
+                height: ${cardRect.height}px;
+                z-index: 9998;
+                transition: all 600ms ease-in-out;
+            `;
+            overlay.appendChild(clone);
 
-        setTimeout(() => {
-            popup.style.opacity = '0';
             setTimeout(() => {
-                popup.remove();
-                if (typeof render === 'function') render();
-                callback();
-            }, 500);
-        }, ANIMATION_CONSTANTS.PENALTY_DISPLAY_DURATION);
-    }, 1500);
+                clone.style.opacity = '0';
+                clone.style.transform = 'scale(0.5) translateY(-30px)';
+            }, i * 50);
+
+            setTimeout(() => clone.remove(), 800);
+        });
+
+        // 5. Déplacer la 6ème carte vers la gauche (position de 1ère carte)
+        setTimeout(() => {
+            sixthCard.style.left = (rowRect.left + 100) + 'px';
+        }, 300);
+        
+        // 6. Afficher le popup de pénalité
+        setTimeout(() => {
+            const popup = document.createElement('div');
+            popup.className = 'fixed top-1/2 left-1/2 bg-red-600 text-white px-8 py-6 rounded-xl shadow-2xl z-[10001] font-bold text-lg';
+            popup.style.cssText = `
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 0;
+                transition: all 0.3s ease-out;
+            `;
+            popup.innerHTML = `
+                <div class="text-center">
+                    <div class="text-3xl mb-2">⚠️ ${escapeHtml(playerName)} ramasse !</div>
+                    <div class="text-4xl mt-3 font-black">+${penaltyPoints} 🐮</div>
+                </div>
+            `;
+            document.body.appendChild(popup);
+
+            requestAnimationFrame(() => {
+                popup.style.transform = 'translate(-50%, -50%) scale(1)';
+                popup.style.opacity = '1';
+            });
+
+            setTimeout(() => {
+                popup.style.opacity = '0';
+                setTimeout(() => {
+                    popup.remove();
+                    sixthCard.remove();
+                    if (typeof render === 'function') render();
+                    callback();
+                }, 300);
+            }, 1500);
+        }, 800);
+    }, 1000);
 };
 
 const animateWaitingForChoice = (data, callback) => {

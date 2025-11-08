@@ -45,38 +45,42 @@ const renderCard = (num, selected = false, clickable = true, small = false) => {
     `;
 };
 
-/* ==================== NOUVEAU: Historique conditionnel ==================== */
+/* ==================== ✅ CORRECTION HISTORIQUE ==================== */
 
 const renderTurnHistory = () => {
     if (!state.game.turnHistory || state.game.turnHistory.length === 0) return '';
     
-    // ✅ AMÉLIORATION : N'afficher l'historique que si tous les joueurs actifs ont joué
+    // Ne montrer que les actions COMPLÈTES (pas les cartes du tour en cours)
     const activePlayers = state.game.players.filter(p => !p.isSpectator);
     const allPlayersPlayed = activePlayers.every(p => hasPlayed(p));
     
-    // ✅ Ou si on est en phase de révélation/résolution
-    const isResolving = state.revealedCards !== null || state.game.waitingForRowChoice !== null;
+    // L'historique montre SEULEMENT :
+    // 1. Les tours complètement résolus (tours précédents)
+    // 2. Les choix de rangées (qui sont des actions définitives)
+    const visibleActions = state.game.turnHistory.filter(action => {
+        // Toujours afficher les choix de rangées
+        if (action.action === 'chose_row') return true;
+        
+        // Pour les cartes jouées : seulement celles des tours précédents
+        if (action.action === 'played') {
+            return action.turn < state.game.currentTurn;
+        }
+        
+        return false;
+    });
     
-    if (!allPlayersPlayed && !isResolving) {
+    if (visibleActions.length === 0) {
         return `
         <div class="bg-gray-100 rounded-lg shadow-lg p-3 mb-2 sm:mb-4 text-center">
             <h3 class="font-bold text-sm mb-2 text-gray-500">📜 Historique</h3>
             <div class="text-xs text-gray-400 italic">
-                🔒 Visible après que tous les joueurs aient joué
+                Aucune action pour le moment
             </div>
         </div>
         `;
     }
     
-    // ✅ Filtrer pour n'afficher que les actions du tour actuel et des tours précédents résolus
-    const currentTurnActions = state.game.turnHistory.filter(action => 
-        action.turn < state.game.currentTurn || 
-        (action.turn === state.game.currentTurn && allPlayersPlayed)
-    );
-    
-    if (currentTurnActions.length === 0) return '';
-    
-    const recentActions = currentTurnActions.slice(-5).reverse();
+    const recentActions = visibleActions.slice(-5).reverse();
     
     return `
     <div class="bg-white rounded-lg shadow-lg p-3 mb-2 sm:mb-4">
@@ -84,9 +88,9 @@ const renderTurnHistory = () => {
         <div class="space-y-1 text-xs">
             ${recentActions.map(action => {
                 if (action.action === 'played') {
-                    return `<div class="text-gray-700">🎴 ${escapeHtml(action.player)} a joué le ${action.card}</div>`;
+                    return `<div class="text-gray-700">🎴 <strong>Tour ${action.turn}</strong> : ${escapeHtml(action.player)} a joué le ${action.card}</div>`;
                 } else if (action.action === 'chose_row') {
-                    return `<div class="text-orange-700">⚠️ ${escapeHtml(action.player)} a ramassé R${action.rowIndex + 1} (+${action.penaltyPoints}🐮)</div>`;
+                    return `<div class="text-orange-700 font-semibold">⚠️ ${escapeHtml(action.player)} a ramassé R${action.rowIndex + 1} (+${action.penaltyPoints}🐮)</div>`;
                 }
                 return '';
             }).join('')}
@@ -244,7 +248,7 @@ const renderJoin = () => `
                     maxlength="6"
                     ${state.invitePending ? 'readonly' : ''}
                 />
-                ${state.invitePending ? '<div class="text-sm text-gray-500 mt-2">Vous avez été invité – vérifiez votre pseudo puis cliquez sur Rejoindre.</div>' : ''}
+                ${state.invitePending ? '<div class="text-sm text-gray-500 mt-2">Vous avez été invité — vérifiez votre pseudo puis cliquez sur Rejoindre.</div>' : ''}
             </div>
 
             <button
@@ -356,6 +360,7 @@ const renderLobby = () => {
     `;
 };
 
+// ✅ CORRECTION CRASH : Vérifications de sécurité renforcées
 const renderGame = () => {
     // ✅ SÉCURITÉ : Vérifier que le jeu est chargé
     if (!state.game || !state.game.players || !Array.isArray(state.game.players)) {
@@ -368,11 +373,19 @@ const renderGame = () => {
         `;
     }
     
-    // ✅ AJOUT : Vérification de sécurité
-    if (!state.game || !state.game.players) {
-        console.warn('Game or players not loaded yet');
-        return '<div class="container mx-auto p-8 text-center">Chargement...</div>';
+    // ✅ SÉCURITÉ : Vérifier que rows existe
+    if (!state.game.rows || !Array.isArray(state.game.rows)) {
+        console.error('Game rows not properly initialized');
+        return `
+            <div class="container mx-auto px-4 py-8">
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-2xl p-8 text-center">
+                    <div class="text-xl text-red-600">❌ Erreur de chargement des rangées</div>
+                    <button onclick="leaveGame()" class="mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg">Quitter</button>
+                </div>
+            </div>
+        `;
     }
+    
     const me = state.game.players.find(p => p.id === state.playerId);
     const activePlayers = state.game.players.filter(p => !p.isSpectator);
     const waitingPlayers = activePlayers.filter(p => !hasPlayed(p));

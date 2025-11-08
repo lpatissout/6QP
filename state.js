@@ -19,7 +19,7 @@ const state = {
     animationSpeed: 800,
     revealedCards: null,
     animationsDisabledReason: null,
-    isSpectator: false // NOUVEAU: Mode spectateur
+    isSpectator: false
 };
 
 /* ==================== PURE HELPERS ==================== */
@@ -41,11 +41,13 @@ const calculateHeads = (card) => {
     return 1;
 };
 
+// ✅ CORRECTION : Couleur basée sur le nombre de têtes, pas sur la valeur
 const getCardColor = (card) => {
-    if (card <= 26) return 'bg-blue-400';
-    if (card <= 52) return 'bg-green-400';
-    if (card <= 78) return 'bg-yellow-400';
-    return 'bg-red-400';
+    const heads = calculateHeads(card);
+    if (heads === 1) return 'bg-green-500';      // 1 tête = vert
+    if (heads === 2) return 'bg-blue-500';       // 2 têtes = bleu
+    if (heads === 3) return 'bg-yellow-500';     // 3 têtes = jaune
+    return 'bg-red-500';                         // 5+ têtes = rouge
 };
 
 const shuffleDeck = () => {
