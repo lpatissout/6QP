@@ -1,4 +1,33 @@
-/* ==================== GAME LOGIC - UTILITIES ==================== */
+const chooseRow = async (rowIndex) => {
+    debugLog('chooseRow called', { rowIndex, playerId: state.playerId });
+    
+    const game = await loadGame(state.gameCode);
+    
+    if (!game) {
+        debugLog('chooseRow: game not found');
+        return;
+    }
+
+    if (game.waitingForRowChoice !== state.playerId) {
+        debugLog('Not authorized to choose row', { allowed: game.waitingForRowChoice });
+        return;
+    }
+
+    const p = game.players.find(x => x.id === state.playerId);
+    const cardBeingPlaced = game.pendingCard; // ✅ Sauvegarder la carte avant de la traiter
+    const penaltyRow = [...game.rows[rowIndex]];
+    const penaltyPoints = calculatePenaltyPoints(penaltyRow);
+    p.score += penaltyPoints;
+    
+    if (!game.turnHistory) game.turnHistory = [];
+    game.turnHistory.push({
+        turn: game.currentTurn,
+        round: game.round,
+        player: p.name,
+        card: cardBeingPlaced,
+        action: 'chose_row',
+        rowIndex: rowIndex,
+        penaltyPoints:/* ==================== GAME LOGIC - UTILITIES ==================== */
 
 // IMPORTANT: Ces fonctions sont déjà définies dans state.js
 // On les réutilise ici pour éviter les duplications
@@ -57,17 +86,34 @@ const resolveTurn = async () => {
     await resolveAllPlays(game);
 };
 
-// ✅ CORRECTION PRINCIPALE : Attendre la résolution des choix de rangées
-const resolveAllPlays = async (game) => {
+// ✅ CORRECTION : Gérer le cas où on doit reprendre après un choix de rangée
+const resolveAllPlays = async (game, startFromCard = null) => {
     const plays = game.players
         .filter(p => Number.isInteger(p.playedCard))
         .map(p => ({ pid: p.id, card: p.playedCard, name: p.name, playerName: p.name }))
         .sort((a, b) => a.card - b.card);
 
-    debugLog('resolveAllPlays', { cards: plays.map(p => p.card) });
+    debugLog('resolveAllPlays', { 
+        cards: plays.map(p => p.card),
+        startFromCard: startFromCard 
+    });
+
+    // ✅ Si on reprend après un choix, sauter les cartes déjà traitées
+    let startIndex = 0;
+    if (startFromCard !== null) {
+        startIndex = plays.findIndex(p => p.card > startFromCard);
+        if (startIndex === -1) {
+            // Toutes les cartes ont été traitées
+            debugLog('All cards processed, advancing phase');
+            await advanceGamePhase(game);
+            return;
+        }
+        debugLog('Resuming from card index', { startIndex, card: plays[startIndex].card });
+    }
 
     // Traiter les cartes UNE PAR UNE dans l'ordre
-    for (const play of plays) {
+    for (let i = startIndex; i < plays.length; i++) {
+        const play = plays[i];
         const p = game.players.find(x => x.id === play.pid);
         const validRows = findValidRows(play.card, game.rows);
 

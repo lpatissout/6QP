@@ -2,7 +2,6 @@
 
 // ✅ AMÉLIORATION : Gestionnaire d'animation qui utilise l'ID unique
 const handleAnimation = (anim) => {
-    // ✅ Utiliser l'ID unique de Firebase ou générer un ID basé sur le timestamp
     const animationId = anim.uniqueId || `${anim.timestamp}-${anim.type}`;
     
     debugLog('Received animation', { 
@@ -11,7 +10,6 @@ const handleAnimation = (anim) => {
         timestamp: anim.timestamp 
     });
     
-    // ✅ Passer l'ID unique au système d'animations
     queueAnimation(anim.type, anim, animationId);
     processAnimationQueue();
 };
@@ -23,15 +21,10 @@ const handleGameUpdate = async (data, oldStatus) => {
         state.screen = 'game';
     }
 
-    // ✅ Ne résoudre QUE si :
-    // - On est l'hôte
-    // - Pas déjà résolu
-    // - Personne n'attend de choisir
-    // - Tous les joueurs ont joué
     if (
         state.game.status === 'playing' &&
         !state.game.turnResolved &&
-        !state.game.waitingForRowChoice &&  // ✅ AJOUT
+        !state.game.waitingForRowChoice &&
         oldStatus === 'playing' &&
         state.playerId === state.game.hostId
     ) {
@@ -40,17 +33,12 @@ const handleGameUpdate = async (data, oldStatus) => {
         
         if (allPlayed) {
             debugLog('All players played -> resolveTurn (by host only)');
-            
-            // ✅ Marquer comme "en cours de résolution" pour éviter les doubles
             state.game.turnResolved = true;
             await saveGame(state.game);
-            
             await resolveTurn();
         }
     }
 };
-
-/* Les autres fonctions restent identiques mais voici les versions complètes pour référence */
 
 const createGame = async () => {
     if (!state.playerName || !state.playerName.trim()) {
@@ -274,7 +262,6 @@ const playCard = async (card) => {
     p.hand = p.hand.filter(c => c !== card);
     state.selectedCard = null;
     
-    // ✅ Ajouter à l'historique (sera masqué jusqu'à ce que tous jouent)
     if (!state.game.turnHistory) state.game.turnHistory = [];
     state.game.turnHistory.push({
         turn: state.game.currentTurn,
@@ -328,6 +315,7 @@ const analyzeRowChoice = (rowIndex, playerCard) => {
     };
 };
 
+// ✅ CORRECTION MAJEURE : Reprendre avec les cartes SUIVANTES, pas toutes
 const chooseRow = async (rowIndex) => {
     debugLog('chooseRow called', { rowIndex, playerId: state.playerId });
     
@@ -344,6 +332,7 @@ const chooseRow = async (rowIndex) => {
     }
 
     const p = game.players.find(x => x.id === state.playerId);
+    const cardBeingPlaced = game.pendingCard; // ✅ Sauvegarder la carte
     const penaltyRow = [...game.rows[rowIndex]];
     const penaltyPoints = calculatePenaltyPoints(penaltyRow);
     p.score += penaltyPoints;
@@ -353,7 +342,7 @@ const chooseRow = async (rowIndex) => {
         turn: game.currentTurn,
         round: game.round,
         player: p.name,
-        card: game.pendingCard,
+        card: cardBeingPlaced,
         action: 'chose_row',
         rowIndex: rowIndex,
         penaltyPoints: penaltyPoints,
@@ -364,22 +353,34 @@ const chooseRow = async (rowIndex) => {
         player: p.name, 
         rowIndex, 
         penaltyPoints,
-        cards: penaltyRow
+        cards: penaltyRow,
+        cardBeingPlaced
     });
 
+    // ✅ Animation de ramassage avec la carte qui s'anime vers la rangée
     if (state.enableAnimations) {
         await publishAnimation(state.gameCode, 'PLAYER_CHOSE_ROW', {
-            card: game.pendingCard,
+            card: cardBeingPlaced,
             rowIndex,
             playerName: p.name,
             penaltyPoints
         });
-        
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise(r => setTimeout(r, 2500));
     }
 
-    game.rows[rowIndex] = [game.pendingCard];
+    // ✅ IMPORTANT : Placer la carte sur la rangée maintenant vide
+    game.rows[rowIndex] = [cardBeingPlaced];
     p.playedCard = null;
+    
+    // ✅ Réinitialiser l'état d'attente
+    game.waitingForRowChoice = null;
+    game.pendingCard = null;
+
+    // ✅ Sauvegarder l'état avec la nouvelle rangée
+    await saveGame(game);
+    
+    // ✅ Petit délai pour synchronisation
+    await new Promise(r => setTimeout(r, 500));
 
     if (p.score >= GAME_CONSTANTS.SCORE_LIMIT) {
         game.status = 'finished';
@@ -389,7 +390,9 @@ const chooseRow = async (rowIndex) => {
         return;
     }
 
-    await resolveAllPlays(game);
+    // ✅ CRUCIAL : Reprendre avec les cartes APRÈS celle qu'on vient de traiter
+    debugLog('Resuming resolveAllPlays after row choice', { startFromCard: cardBeingPlaced });
+    await resolveAllPlays(game, cardBeingPlaced); // ✅ Passer la carte comme point de reprise
 };
 
 const restartGame = async () => {
