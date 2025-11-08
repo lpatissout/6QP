@@ -83,6 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
         animationsEnabled: state.enableAnimations 
     });
 
+    // Vérifier que render est disponible
+    if (typeof render !== 'function') {
+        console.error('ERREUR: render() n\'est pas définie. Vérifiez l\'ordre de chargement des scripts.');
+        return;
+    }
+
     // Détection d'un lien d'invitation
     const urlParams = new URLSearchParams(window.location.search);
     const joinCode = urlParams.get('join');
@@ -102,8 +108,10 @@ document.addEventListener('DOMContentLoaded', () => {
         state.invitePending = false;
     }
 
-    // Premier rendu
-    render();
+    // Premier rendu - avec un délai pour s'assurer que tout est chargé
+    setTimeout(() => {
+        render();
+    }, 100);
 
     // Détection du redimensionnement
     window.addEventListener('resize', () => {
