@@ -21,13 +21,13 @@ const GAME_CONSTANTS = {
     TOTAL_CARDS: 104
 };
 
-// Constantes d'animation
 const ANIMATION_CONSTANTS = {
-    REVEAL_DURATION: 2000,
-    FADE_DURATION: 500,
-    CARD_FLIGHT_DURATION: 1200,
-    PENALTY_DISPLAY_DURATION: 2000,
-    SIXTH_CARD_ANIMATION_DURATION: 3500
+  REVEAL_DURATION: 2500,      // Temps pour afficher les cartes révélées
+  FADE_DURATION: 500,         // Temps pour faire disparaître l'overlay
+  CARD_FLIGHT_DURATION: 800,  // Temps pour que la carte vole vers la rangée
+  PENALTY_POPUP_DURATION: 1500, // Temps du popup de pénalité
+  BANNER_DURATION: 2000,      // Temps des banners explicatives
+  NEW_ROUND_DURATION: 2500,   // Temps du popup de nouvelle manche
 };
 
 // Initialisation Firebase
