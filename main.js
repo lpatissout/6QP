@@ -130,6 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Liaison du bouton "Rejoindre la partie"
     document.addEventListener('click', (e) => {
+          // ✅ START ANIMATION LOOP - Process animation queue every 50ms
+  if (typeof processAnimationQueue === 'function') {
+    setInterval(processAnimationQueue, 50);
+  }
         if (e.target && e.target.id === 'join-btn') {
             if (!state.playerName || !state.playerName.trim()) {
                 alert("Merci d'entrer un pseudo avant de rejoindre.");
