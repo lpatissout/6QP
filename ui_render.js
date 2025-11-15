@@ -540,6 +540,7 @@ const renderGame = () => {
 
 const render = () => {
     const app = document.getElementById('app');
+      if (typeof getOverlay === 'function') getOverlay(); // ✅ Ensure overlay exists for animations
     if (!app) return;
 
     switch (state.screen) {
