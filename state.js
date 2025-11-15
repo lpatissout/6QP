@@ -13,12 +13,12 @@ const state = {
     showDebug: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
     invitePending: false,
-    animationQueue: [],
-    isAnimating: false,
-    enableAnimations: true,
-    animationSpeed: 800,
-    revealedCards: null,
-    animationsDisabledReason: null,
+    animationQueue: [],           // Queue des animations à jouer
+    isAnimating: false,          // Si une animation est en cours
+    enableAnimations: true,      // Animations activées/désactivées
+    animationSpeed: 800,         // Vitesse des animations (ms)
+    revealedCards: null,         // Cartes révélées pour affichage
+    animationsDisabledReason: '', // Raison si animations off
     isSpectator: false,
     isProcessingChoice: false // ✅ NOUVEAU : Protection contre double-clic
 };
