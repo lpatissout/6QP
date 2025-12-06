@@ -1,0 +1,135 @@
+/* Styles personnalisés pour le jeu 6 qui prend ! */
+
+/* Animations personnalisées */
+@keyframes cardReveal {
+    0% {
+        transform: scale(0) rotate(180deg);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+@keyframes cardFly {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+    100% {
+        transform: translate(var(--target-x), var(--target-y)) scale(0.8);
+    }
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-10px);
+    }
+    75% {
+        transform: translateX(10px);
+    }
+}
+
+/* Styles pour les cartes */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card.selected {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.6);
+}
+
+/* Responsive pour mobile */
+@media (max-width: 768px) {
+    .card {
+        width: 60px !important;
+        height: 90px !important;
+        min-width: 60px !important;
+    }
+    
+    .card .text-2xl {
+        font-size: 1.25rem;
+    }
+    
+    .card .text-sm {
+        font-size: 0.75rem;
+    }
+}
+
+/* Styles pour les rangées */
+.row-container {
+    min-height: 150px;
+}
+
+/* Animation de shake pour les rangées */
+.row-shake {
+    animation: shake 0.5s;
+}
+
+/* Styles pour le modal */
+.modal-backdrop {
+    backdrop-filter: blur(4px);
+}
+
+/* Styles pour les messages toast */
+.toast {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Amélioration de l'accessibilité */
+button:focus,
+input:focus {
+    outline: 2px solid #f97316;
+    outline-offset: 2px;
+}
+
+/* Styles pour les cartes selon le nombre de têtes */
+.card-green {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.card-blue {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.card-yellow {
+    background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+}
+
+.card-red {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Animation de pulse pour les notifications */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.pulse-animation {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
