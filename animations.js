@@ -102,17 +102,6 @@ const playAnimation = (anim) => {
 };
 
 /* ==================== HELPER FUNCTIONS ==================== */
-
-// ✅ HELPER: Get card color based on card number
-const getCardColor = (card) => {
-  const num = parseInt(card);
-  if (num <= 10) return 'bg-blue-500';
-  if (num <= 20) return 'bg-green-500';
-  if (num <= 30) return 'bg-yellow-500';
-  if (num <= 40) return 'bg-red-500';
-  return 'bg-purple-500';
-};
-
 // ✅ HELPER: Escape HTML to prevent XSS
 const escapeHtml = (text) => {
   const div = document.createElement('div');
