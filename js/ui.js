@@ -225,13 +225,49 @@ const UI = {
     // ✅ NOUVEAU : Bouton de confirmation
     if (AppState.selectedCard && !hasAlreadyPlayed) {
         const confirmBtn = document.createElement('button');
+        confirmBtn.type = 'button'; // ✅ Important : éviter la soumission de formulaire
         confirmBtn.id = 'btn-confirm-card';
         confirmBtn.className = 'mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-lg transition-colors shadow-lg text-lg';
         confirmBtn.innerHTML = `🎯 Jouer la carte <span class="font-black">${AppState.selectedCard}</span>`;
-        confirmBtn.addEventListener('click', () => {
-            this.confirmCardSelection(AppState.selectedCard);
+        
+        // ✅ CORRECTION : Capturer la valeur de la carte et utiliser arrow function pour préserver le contexte
+        const selectedCardValue = AppState.selectedCard;
+        const self = this; // Capturer le contexte
+        
+        confirmBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🔘 Bouton cliqué, carte:', selectedCardValue);
+            console.log('🔘 Élément bouton:', this);
+            console.log('🔘 Contexte UI:', self);
+            
+            // Vérifier que la carte est toujours sélectionnée
+            if (!selectedCardValue) {
+                console.error('❌ Aucune carte sélectionnée');
+                UI.showError('Aucune carte sélectionnée');
+                return;
+            }
+            
+            // Désactiver le bouton immédiatement pour éviter les doubles clics
+            this.disabled = true;
+            this.textContent = '⏳ Traitement...';
+            
+            try {
+                console.log('📞 Appel de confirmCardSelection...');
+                await self.confirmCardSelection(selectedCardValue);
+                console.log('✅ confirmCardSelection terminé');
+            } catch (error) {
+                console.error('❌ Erreur dans confirmCardSelection:', error);
+                UI.showError('Erreur lors de la confirmation de la carte');
+                // Réactiver le bouton en cas d'erreur
+                this.disabled = false;
+                this.innerHTML = `🎯 Jouer la carte <span class="font-black">${selectedCardValue}</span>`;
+            }
         });
+        
         handElement.appendChild(confirmBtn);
+        console.log('✅ Bouton de confirmation créé pour la carte:', selectedCardValue);
+        console.log('✅ Bouton ajouté au DOM:', confirmBtn);
     }
 },
     
@@ -294,11 +330,20 @@ const UI = {
      * ✅ CORRECTION : Vérifications strictes + mise à jour complète de l'UI
      */
     async confirmCardSelection(card) {
+        console.log('🎯 confirmCardSelection appelé avec la carte:', card);
+        
         const localPlayer = StateHelpers.getLocalPlayer();
         if (!localPlayer) {
+            console.error('❌ Joueur local introuvable');
             UI.showError('Joueur introuvable');
             return;
         }
+        
+        console.log('📋 État du joueur:', {
+            playedCard: localPlayer.playedCard,
+            hand: localPlayer.hand,
+            cardToPlay: card
+        });
         
         // ✅ CORRECTION : Vérification stricte avec type checking
         const hasPlayed = localPlayer.playedCard !== null && 
@@ -315,30 +360,47 @@ const UI = {
         
         // Vérifier que la carte est toujours dans la main
         if (!localPlayer.hand || !localPlayer.hand.includes(card)) {
+            console.error('❌ Carte non trouvée dans la main:', card, 'Main:', localPlayer.hand);
             UI.showError('Cette carte n\'est plus dans votre main');
             AppState.selectedCard = null;
             this.updateHand(localPlayer.hand, localPlayer.playedCard);
             return;
         }
         
+        // Vérifier que le code de partie existe
+        if (!AppState.game.code) {
+            console.error('❌ Code de partie manquant');
+            UI.showError('Code de partie manquant');
+            return;
+        }
+        
         try {
-            console.log('✅ Confirmation de la carte:', card);
+            console.log('✅ Début de la confirmation de la carte:', card);
+            console.log('📤 Envoi à Firebase - Code:', AppState.game.code, 'Joueur:', AppState.player.id);
             
             // Désactiver le bouton pendant l'envoi
             const confirmBtn = document.getElementById('btn-confirm-card');
             if (confirmBtn) {
                 confirmBtn.disabled = true;
                 confirmBtn.textContent = '⏳ Envoi...';
+                console.log('🔒 Bouton désactivé');
+            } else {
+                console.warn('⚠️ Bouton de confirmation non trouvé');
             }
             
             await playCard(AppState.game.code, AppState.player.id, card);
+            console.log('✅ Carte jouée avec succès dans Firebase');
+            
             AppState.selectedCard = null;
             
             // ✅ CORRECTION : Rafraîchir complètement l'UI
+            console.log('🔄 Mise à jour de l\'UI...');
             this.updateGameUI();
+            console.log('✅ UI mise à jour');
             
         } catch (error) {
             console.error('❌ Erreur confirmation carte:', error);
+            console.error('❌ Stack trace:', error.stack);
             UI.showError(error.message || 'Erreur lors de la sélection de la carte');
             
             // Réactiver le bouton en cas d'erreur
@@ -346,6 +408,7 @@ const UI = {
             if (confirmBtn) {
                 confirmBtn.disabled = false;
                 confirmBtn.innerHTML = `🎯 Jouer la carte <span class="font-black">${card}</span>`;
+                console.log('🔓 Bouton réactivé après erreur');
             }
         }
     },
