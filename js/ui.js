@@ -185,40 +185,55 @@ const UI = {
      * Met à jour l'affichage de la main du joueur
      */
     updateHand(hand, playedCard) {
-        const handElement = document.getElementById('player-hand');
-        if (!handElement) return;
+    const handElement = document.getElementById('player-hand');
+    if (!handElement) return;
+    
+    handElement.innerHTML = '';
+    
+    if (!hand || hand.length === 0) {
+        handElement.innerHTML = '<p class="text-gray-500">Aucune carte</p>';
+        return;
+    }
+    
+    // ✅ CORRECTION : Vérifier strictement si le joueur a joué
+    const hasAlreadyPlayed = playedCard !== null && 
+                             playedCard !== undefined && 
+                             typeof playedCard === 'number';
+    
+    hand.forEach(card => {
+        const cardElement = this.createCardElement(card, true);
         
-        handElement.innerHTML = '';
-        
-        if (!hand || hand.length === 0) {
-            handElement.innerHTML = '<p class="text-gray-500">Aucune carte</p>';
-            return;
+        // Si c'est la carte sélectionnée
+        if (AppState.selectedCard === card && !hasAlreadyPlayed) {
+            cardElement.classList.add('ring-4', 'ring-orange-500', 'scale-110');
         }
         
-        hand.forEach(card => {
-            const cardElement = this.createCardElement(card, true);
-            
-            // Si c'est la carte sélectionnée
-            if (AppState.selectedCard === card) {
-                Animations.selectCard(cardElement);
-            }
-            
-            // Si c'est la carte déjà jouée
-            if (playedCard === card) {
-                cardElement.classList.add('opacity-50', 'cursor-not-allowed');
-                cardElement.innerHTML += '<div class="absolute inset-0 flex items-center justify-center"><span class="text-white font-bold">✓</span></div>';
-            } else {
-                // Ajouter l'événement de clic
-                cardElement.addEventListener('click', () => {
-                    if (playedCard === null) {
-                        this.selectCard(card);
-                    }
-                });
-            }
-            
-            handElement.appendChild(cardElement);
+        // ✅ CORRECTION : Event listener sans condition bloquante
+        if (!hasAlreadyPlayed) {
+            cardElement.addEventListener('click', () => {
+                this.selectCard(card);
+            });
+            cardElement.classList.add('cursor-pointer', 'hover:scale-105');
+        } else {
+            // Si le joueur a déjà joué, griser toutes les cartes
+            cardElement.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        handElement.appendChild(cardElement);
+    });
+    
+    // ✅ NOUVEAU : Bouton de confirmation
+    if (AppState.selectedCard && !hasAlreadyPlayed) {
+        const confirmBtn = document.createElement('button');
+        confirmBtn.id = 'btn-confirm-card';
+        confirmBtn.className = 'mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-lg transition-colors shadow-lg text-lg';
+        confirmBtn.innerHTML = `🎯 Jouer la carte <span class="font-black">${AppState.selectedCard}</span>`;
+        confirmBtn.addEventListener('click', () => {
+            this.confirmCardSelection(AppState.selectedCard);
         });
-    },
+        handElement.appendChild(confirmBtn);
+    }
+},
     
     /**
      * Crée un élément de carte
@@ -252,31 +267,27 @@ const UI = {
      * Sélectionne une carte
      */
     selectCard(card) {
-        // Désélectionner l'ancienne carte
-        if (AppState.selectedCard) {
-            const oldCardElement = Array.from(document.querySelectorAll('#player-hand > div')).find(
-                el => el.textContent.includes(AppState.selectedCard)
-            );
-            if (oldCardElement) {
-                Animations.deselectCard(oldCardElement);
-            }
-        }
-        
-        // Si la même carte est cliquée, confirmer
-        if (AppState.selectedCard === card) {
-            this.confirmCardSelection(card);
-            return;
-        }
-        
-        // Sélectionner la nouvelle carte
-        AppState.selectedCard = card;
-        const cardElement = Array.from(document.querySelectorAll('#player-hand > div')).find(
-            el => el.textContent.includes(card)
-        );
-        if (cardElement) {
-            Animations.selectCard(cardElement);
-        }
-    },
+    const localPlayer = StateHelpers.getLocalPlayer();
+    if (!localPlayer) return;
+    
+    // ✅ Vérifier qu'on n'a pas déjà joué
+    const hasPlayed = localPlayer.playedCard !== null && 
+                     localPlayer.playedCard !== undefined && 
+                     typeof localPlayer.playedCard === 'number';
+    
+    if (hasPlayed) {
+        console.warn('⚠️ Vous avez déjà joué une carte');
+        return;
+    }
+    
+    // Sélectionner la carte
+    AppState.selectedCard = card;
+    console.log('🎯 Carte sélectionnée:', card);
+    
+    // Rafraîchir l'affichage
+    this.updateHand(localPlayer.hand, localPlayer.playedCard);
+    this.updateGameStatus();
+},
     
     /**
      * Confirme la sélection d'une carte
@@ -301,27 +312,46 @@ const UI = {
      * Met à jour le statut du jeu
      */
     updateGameStatus() {
-        const statusElement = document.getElementById('game-status');
-        if (!statusElement) return;
+    const statusElement = document.getElementById('game-status');
+    if (!statusElement) return;
+    
+    const localPlayer = StateHelpers.getLocalPlayer();
+    if (!localPlayer) {
+        statusElement.innerHTML = '<span class="text-gray-500">⏳ Chargement...</span>';
+        return;
+    }
+    
+    // ✅ CORRECTION : Vérification stricte avec type checking
+    const hasPlayedCard = localPlayer.playedCard !== null && 
+                         localPlayer.playedCard !== undefined && 
+                         typeof localPlayer.playedCard === 'number';
+    
+    if (hasPlayedCard) {
+        statusElement.innerHTML = '<span class="text-green-600 text-lg font-semibold">✅ Vous avez joué votre carte</span>';
         
-        const localPlayer = StateHelpers.getLocalPlayer();
-        if (!localPlayer) return;
+        // Afficher qui attend encore
+        const waitingPlayers = AppState.game.players.filter(p => {
+            const pHasPlayed = p.playedCard !== null && 
+                              p.playedCard !== undefined && 
+                              typeof p.playedCard === 'number';
+            return !pHasPlayed && p.id !== AppState.player.id;
+        });
         
-        if (localPlayer.playedCard !== null) {
-            statusElement.innerHTML = '<span class="text-green-600">✅ Vous avez joué votre carte</span>';
-            
-            // Afficher qui attend encore
-            const waitingPlayers = AppState.game.players.filter(
-                p => p.playedCard === null && p.id !== AppState.player.id
-            );
-            if (waitingPlayers.length > 0) {
-                const names = waitingPlayers.map(p => p.name).join(', ');
-                statusElement.innerHTML += `<br><span class="text-gray-500">⏳ En attente de: ${names}</span>`;
-            }
+        if (waitingPlayers.length > 0) {
+            const names = waitingPlayers.map(p => p.name).join(', ');
+            statusElement.innerHTML += `<br><span class="text-gray-600">⏳ En attente de : ${names}</span>`;
         } else {
-            statusElement.innerHTML = '<span class="text-orange-600">🎯 Sélectionnez une carte à jouer</span>';
+            statusElement.innerHTML += `<br><span class="text-blue-600 animate-pulse">⚡ Résolution du tour...</span>`;
         }
-    },
+    } else {
+        // Messages selon l'état de sélection
+        if (AppState.selectedCard) {
+            statusElement.innerHTML = '<span class="text-orange-600 text-lg font-semibold animate-pulse">👇 Cliquez sur "Jouer la carte" pour confirmer</span>';
+        } else {
+            statusElement.innerHTML = '<span class="text-orange-600 text-lg">🎯 Sélectionnez une carte à jouer</span>';
+        }
+    }
+},
     
     /**
      * Affiche la zone de révélation
