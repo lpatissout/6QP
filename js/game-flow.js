@@ -14,8 +14,8 @@ async function processTurn() {
     const game = AppState.game;
     const players = game.players;
     
-    // Vérifier si tous les joueurs ont joué
-    const allPlayed = players.every(p => p.playedCard !== null && p.playedCard !== undefined);
+    // ✅ CORRECTION : Vérification stricte avec type checking
+    const allPlayed = players.every(p => StateHelpers.hasPlayerPlayed(p));
     
     if (!allPlayed) {
         return;
@@ -41,15 +41,17 @@ async function processTurn() {
         // Phase de résolution - placer les cartes dans l'ordre
         await resolveTurn();
         
-        // Vérifier si toutes les cartes ont été placées
+        // ✅ CORRECTION : Vérification stricte si toutes les cartes ont été placées
         const allCardsPlaced = players.every(p => {
             // Vérifier si la carte a été retirée de la main (placée)
             const localPlayer = StateHelpers.getLocalPlayer();
             if (p.id === AppState.player.id && localPlayer) {
-                return !localPlayer.hand.includes(p.playedCard);
+                // Pour le joueur local, vérifier que la carte n'est plus dans la main
+                const hasPlayed = StateHelpers.hasPlayerPlayed(localPlayer);
+                return hasPlayed && !localPlayer.hand.includes(p.playedCard);
             }
-            // Pour les autres joueurs, on suppose que si playedCard n'est pas null, c'est joué
-            return p.playedCard !== null;
+            // Pour les autres joueurs, vérification stricte
+            return StateHelpers.hasPlayerPlayed(p);
         });
         
         if (allCardsPlaced && !game.waitingForChoice) {
@@ -77,8 +79,9 @@ async function revealCards() {
     const game = AppState.game;
     const players = game.players;
     
+    // ✅ CORRECTION : Vérification stricte
     const playedCards = players
-        .filter(p => p.playedCard !== null && p.playedCard !== undefined)
+        .filter(p => StateHelpers.hasPlayerPlayed(p))
         .map(p => ({
             playerId: p.id,
             playerName: p.name,
@@ -96,9 +99,9 @@ async function resolveTurn() {
     const game = AppState.game;
     const players = game.players;
     
-    // Récupérer toutes les cartes jouées
+    // ✅ CORRECTION : Récupérer toutes les cartes jouées avec vérification stricte
     const playedCards = players
-        .filter(p => p.playedCard !== null && p.playedCard !== undefined)
+        .filter(p => StateHelpers.hasPlayerPlayed(p))
         .map(p => ({
             playerId: p.id,
             playerName: p.name,

@@ -51,6 +51,14 @@ const StateHelpers = {
                AppState.game.players.every(p => p.ready);
     },
     
+    // ✅ NOUVEAU : Vérifier strictement si un joueur a joué sa carte
+    hasPlayerPlayed(player) {
+        return player && 
+               player.playedCard !== null && 
+               player.playedCard !== undefined && 
+               typeof player.playedCard === 'number';
+    },
+    
     // Obtenir l'index de la rangée avec la dernière carte la plus proche mais inférieure
     findRowForCard(cardValue) {
         const rows = AppState.game.rows;
