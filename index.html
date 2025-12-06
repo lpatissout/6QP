@@ -1,55 +1,218 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="fr">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Description" content="Jeu de cartes multijoueur en ligne - 6 qui prend!">
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2487.6">
-  <style type="text/css">
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000}
-    p.p3 {margin: 0.0px 0.0px 0.0px 0.0px; font: 11.0px 'Helvetica Neue'; color: #000000; color: rgba(0, 0, 0, 0.85); -webkit-text-stroke: rgba(0, 0, 0, 0.85)}
-    p.p4 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000; min-height: 14.0px}
-    p.p6 {margin: 0.0px 0.0px 12.0px 0.0px; font: 12.0px Times; -webkit-text-stroke: #000000}
-    span.s1 {font: 24.0px 'Apple Color Emoji'; font-kerning: none}
-    span.s2 {font-kerning: none}
-    span.s3 {font: 11.0px '.Apple Color Emoji UI'; font-kerning: none; background-color: #b3b3b3}
-    span.s4 {font-kerning: none; background-color: #b3b3b3}
-    span.s5 {font: 18.0px 'Apple Color Emoji'; font-kerning: none}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐮 6 qui prend !</title>
+    <meta name="description" content="Jeu de cartes multijoueur en ligne - 6 qui prend!">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
-<body>
-<h1 style="margin: 0.0px 0.0px 16.1px 0.0px; font: 24.0px Times; -webkit-text-stroke: #000000"><span class="s1">🐮</span><span class="s2"><b> 6 qui prend !</b></span></h1>
-<p class="p2"><span class="s2">Votre pseudo</span></p>
-<p class="p3"><span class="s3">🎮</span><span class="s4"> Créer une partie</span></p>
-<p class="p4"><span class="s2"></span><br></p>
-<p class="p2"><span class="s2">OU</span></p>
-<p class="p2"><span class="s2">Code de partie</span></p>
-<p class="p3"><span class="s3">🚪</span><span class="s4"> Rejoindre une partie</span></p>
-<p class="p4"><span class="s2"></span><br></p>
-<h2 style="margin: 0.0px 0.0px 14.9px 0.0px; font: 18.0px Times; -webkit-text-stroke: #000000"><span class="s2"><b>Salle d'attente</b></span></h2>
-<p class="p6"><span class="s2">Code de la partie</span></p>
-<p class="p3"><span class="s3">📋</span><span class="s4"> Copier</span></p>
-<h3 style="margin: 0.0px 0.0px 14.0px 0.0px; font: 14.0px Times; -webkit-text-stroke: #000000"><span class="s2"><b>Joueurs</b></span></h3>
-<p class="p4"><span class="s2"></span><br></p>
-<p class="p3"><span class="s3">✅</span><span class="s4"> Je suis prêt ! </span><span class="s3">🚀</span><span class="s4"> Lancer la partie Quitter</span></p>
-<p class="p2"><span class="s2">Manche 1 / 6</span></p>
-<p class="p2"><span class="s2">Tour 1 / 10</span></p>
-<p class="p4"><span class="s2"></span><br></p>
-<h3 style="margin: 0.0px 0.0px 14.0px 0.0px; font: 14.0px Times; -webkit-text-stroke: #000000"><span class="s2"><b>Rangées</b></span></h3>
-<p class="p4"><span class="s2"></span><br></p>
-<h3 style="margin: 0.0px 0.0px 14.0px 0.0px; font: 14.0px Times; -webkit-text-stroke: #000000"><span class="s2"><b>Cartes jouées</b></span></h3>
-<p class="p4"><span class="s2"></span><br></p>
-<h3 style="margin: 0.0px 0.0px 14.0px 0.0px; font: 14.0px Times; -webkit-text-stroke: #000000"><span class="s2"><b>Votre main</b></span></h3>
-<p class="p4"><span class="s2"></span><br></p>
-<p class="p4"><span class="s2"></span><br></p>
-<h3 style="margin: 0.0px 0.0px 14.0px 0.0px; font: 14.0px Times; -webkit-text-stroke: #000000"><span class="s2"><b>Choisissez une rangée à ramasser</b></span></h3>
-<p class="p6"><span class="s2">Votre carte est trop petite pour toutes les rangéess</span></p>
-<p class="p4"><span class="s2"></span><br></p>
-<p class="p3"><span class="s4">Quitter la partie</span></p>
-<h2 style="margin: 0.0px 0.0px 14.9px 0.0px; font: 18.0px Times; -webkit-text-stroke: #000000"><span class="s5">🎉</span><span class="s2"><b> Partie terminée !</b></span></h2>
-<p class="p4"><span class="s2"></span><br></p>
-<p class="p3"><span class="s3">🔄</span><span class="s4"> Rejouer Quitter</span></p>
+<body class="bg-gradient-to-br from-amber-50 to-orange-100 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Écran Home -->
+        <div id="screen-home" class="screen">
+            <div class="max-w-md mx-auto bg-white rounded-lg shadow-xl p-8">
+                <h1 class="text-4xl font-bold text-center mb-8 text-orange-600">🐮 6 qui prend !</h1>
+                
+                <div class="mb-6">
+                    <label for="player-name" class="block text-sm font-medium text-gray-700 mb-2">
+                        Votre pseudo
+                    </label>
+                    <input 
+                        type="text" 
+                        id="player-name" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        placeholder="Entrez votre pseudo"
+                        maxlength="20"
+                    >
+                </div>
+
+                <div class="space-y-4">
+                    <button 
+                        id="btn-create-game" 
+                        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                    >
+                        🎮 Créer une partie
+                    </button>
+                    
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-300"></div>
+                        </div>
+                        <div class="relative flex justify-center text-sm">
+                            <span class="px-2 bg-white text-gray-500">OU</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="game-code" class="block text-sm font-medium text-gray-700 mb-2">
+                            Code de partie
+                        </label>
+                        <input 
+                            type="text" 
+                            id="game-code" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent uppercase"
+                            placeholder="ABC123"
+                            maxlength="6"
+                        >
+                    </div>
+
+                    <button 
+                        id="btn-join-game" 
+                        class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                    >
+                        🚪 Rejoindre une partie
+                    </button>
+                </div>
+
+                <div id="error-message" class="mt-4 text-red-600 text-sm text-center hidden"></div>
+            </div>
+        </div>
+
+        <!-- Écran Lobby -->
+        <div id="screen-lobby" class="screen hidden">
+            <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8">
+                <h2 class="text-3xl font-bold text-center mb-6 text-orange-600">Salle d'attente</h2>
+                
+                <div class="text-center mb-6">
+                    <p class="text-sm text-gray-600 mb-2">Code de la partie</p>
+                    <div class="flex items-center justify-center gap-4">
+                        <code id="lobby-game-code" class="text-4xl font-mono font-bold text-orange-600 bg-orange-50 px-6 py-3 rounded-lg"></code>
+                        <button 
+                            id="btn-copy-link" 
+                            class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg text-sm transition-colors"
+                            title="Copier le lien d'invitation"
+                        >
+                            📋 Copier
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-3">Joueurs</h3>
+                    <div id="lobby-players-list" class="space-y-2"></div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button 
+                        id="btn-ready" 
+                        class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                    >
+                        ✅ Je suis prêt !
+                    </button>
+                    <button 
+                        id="btn-start-game" 
+                        class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg transition-colors hidden"
+                    >
+                        🚀 Lancer la partie
+                    </button>
+                    <button 
+                        id="btn-leave-lobby" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+                    >
+                        Quitter
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Écran Game -->
+        <div id="screen-game" class="screen hidden">
+            <!-- Header avec scores -->
+            <div class="mb-6 bg-white rounded-lg shadow-lg p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <div>
+                        <span class="text-sm text-gray-600">Manche</span>
+                        <span id="current-round" class="text-xl font-bold text-orange-600 ml-2">1</span>
+                        <span class="text-sm text-gray-600">/ 6</span>
+                    </div>
+                    <div>
+                        <span class="text-sm text-gray-600">Tour</span>
+                        <span id="current-turn" class="text-xl font-bold text-orange-600 ml-2">1</span>
+                        <span class="text-sm text-gray-600">/ 10</span>
+                    </div>
+                </div>
+                <div id="game-scores" class="flex gap-4 flex-wrap"></div>
+            </div>
+
+            <!-- Plateau avec 4 rangées -->
+            <div class="mb-6 bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 text-center">Rangées</h3>
+                <div id="game-rows" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Les rangées seront générées dynamiquement -->
+                </div>
+            </div>
+
+            <!-- Zone de révélation (cachée par défaut) -->
+            <div id="reveal-zone" class="mb-6 bg-white rounded-lg shadow-lg p-6 hidden">
+                <h3 class="text-lg font-semibold mb-4 text-center">Cartes jouées</h3>
+                <div id="revealed-cards" class="flex justify-center gap-4 flex-wrap"></div>
+            </div>
+
+            <!-- Main du joueur -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">Votre main</h3>
+                <div id="player-hand" class="flex gap-2 flex-wrap justify-center"></div>
+                <div id="game-status" class="mt-4 text-center text-gray-600"></div>
+            </div>
+
+            <!-- Popup pour choix de rangée (caché par défaut) -->
+            <div id="row-choice-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+                <div class="bg-white rounded-lg shadow-xl p-8 max-w-md">
+                    <h3 class="text-xl font-bold mb-4 text-center">Choisissez une rangée à ramasser</h3>
+                    <p class="text-center text-gray-600 mb-6">Votre carte est trop petite pour toutes les rangées</p>
+                    <div id="row-choice-options" class="grid grid-cols-2 gap-4"></div>
+                </div>
+            </div>
+
+            <!-- Bouton quitter -->
+            <div class="mt-6 text-center">
+                <button 
+                    id="btn-leave-game" 
+                    class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                >
+                    Quitter la partie
+                </button>
+            </div>
+        </div>
+
+        <!-- Écran End -->
+        <div id="screen-end" class="screen hidden">
+            <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8">
+                <h2 class="text-4xl font-bold text-center mb-8 text-orange-600">🎉 Partie terminée !</h2>
+                
+                <div id="end-ranking" class="mb-8 space-y-4"></div>
+
+                <div class="flex gap-4 justify-center">
+                    <button 
+                        id="btn-replay" 
+                        class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors hidden"
+                    >
+                        🔄 Rejouer
+                    </button>
+                    <button 
+                        id="btn-leave-end" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                    >
+                        Quitter
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/firebase.js"></script>
+    <script src="js/game-logic.js"></script>
+    <script src="js/game-flow.js"></script>
+    <script src="js/animations.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
+
